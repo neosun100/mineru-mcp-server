@@ -1,0 +1,4 @@
+playwright>=1.40.0
+requests>=2.31.0
+PyJWT>=2.8.0
+pyyaml>=6.0

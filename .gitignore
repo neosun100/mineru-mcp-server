@@ -1,0 +1,31 @@
+# ⚠️ 敏感信息 - 绝对不要提交！
+cookies.json
+token_*.txt
+*.log
+accounts.yaml
+
+# 运行时生成的敏感文件
+*_cookie*.json
+*_token*.txt
+*_session*.json
+
+# 临时文件
+*.pyc
+__pycache__/
+step*.png
+.DS_Store
+
+# 归档文件
+archive/
+
+# 测试文件（排除主测试文件）
+*_test.py
+test_*.py
+!test_all.py
+!test_workflow.sh
+
+# 其他敏感信息
+*.key
+*.pem
+*.env
+.env.*
