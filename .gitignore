@@ -3,6 +3,7 @@ cookies.json
 token_*.txt
 *.log
 accounts.yaml
+all_tokens.json
 
 # 运行时生成的敏感文件
 *_cookie*.json
