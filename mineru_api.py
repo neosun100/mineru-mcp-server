@@ -9,16 +9,18 @@ import random
 from typing import Optional, Dict, Any
 
 class MinerUAPI:
-    """MinerU API 客户端 - 支持多账户负载均衡"""
+    """MinerU API 客户端 - 支持多账户负载均衡 + 自动Token刷新"""
     
-    def __init__(self, tokens_file='all_tokens.json'):
+    def __init__(self, tokens_file='all_tokens.json', auto_refresh=True):
         """
         初始化 MinerU API 客户端
         
         Args:
             tokens_file: Token配置文件路径
+            auto_refresh: 是否自动检测并刷新过期Token
         """
         self.tokens_file = tokens_file
+        self.auto_refresh = auto_refresh
         self.tokens = self._load_tokens()
         self.base_url = 'https://mineru.net/api/v4'
         
@@ -26,6 +28,10 @@ class MinerUAPI:
             raise ValueError("未找到可用的Token，请先运行 batch_login.py")
         
         print(f"✅ 已加载 {len(self.tokens)} 个账户的Token")
+        
+        # 自动检测Token是否过期
+        if self.auto_refresh:
+            self._check_and_refresh_tokens()
     
     def _load_tokens(self) -> Dict:
         """加载所有Token"""
@@ -34,6 +40,46 @@ class MinerUAPI:
                 return json.load(f)
         except FileNotFoundError:
             return {}
+    
+    def _check_token_expiry(self, token_name: str) -> bool:
+        """
+        检查Token是否过期
+        Token名称格式: token-20260125013352
+        从名称中提取创建时间，判断是否超过14天
+        """
+        try:
+            # 提取时间戳: token-YYYYMMDDHHmmss
+            timestamp_str = token_name.replace('token-', '')
+            from datetime import datetime, timedelta
+            
+            # 解析创建时间
+            created_time = datetime.strptime(timestamp_str, '%Y%m%d%H%M%S')
+            
+            # 计算是否过期（14天）
+            now = datetime.now()
+            days_passed = (now - created_time).days
+            
+            return days_passed >= 13  # 提前1天刷新
+        except:
+            return False
+    
+    def _check_and_refresh_tokens(self):
+        """检查所有Token，如果有过期的则提示刷新"""
+        expired_accounts = []
+        
+        for email, token_info in self.tokens.items():
+            token_name = token_info['token_name']
+            if self._check_token_expiry(token_name):
+                expired_accounts.append(token_info['name'])
+        
+        if expired_accounts:
+            print(f"\n⚠️  检测到 {len(expired_accounts)} 个账户Token即将过期:")
+            for name in expired_accounts:
+                print(f"   - {name}")
+            print(f"\n💡 建议运行: python3 batch_login.py")
+            print(f"   或运行: python3 login_complete.py 单独更新\n")
+        else:
+            print("✅ 所有Token有效期正常")
     
     def _get_random_token(self) -> tuple:
         """随机选择一个Token（负载均衡）"""
