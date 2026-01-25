@@ -269,12 +269,30 @@ async def call_tool(name: str, arguments: dict) -> Sequence[TextContent | ImageC
         
         if name == "process_document":
             logger.info("处理 process_document 工具调用")
-            # 处理单个文档
+            # 处理单个文档（自动处理超大文件）
             file_path = arguments["file_path"]
             logger.info(f"文件路径: {file_path}")
             
             options = {k: v for k, v in arguments.items() if k != "file_path"}
             logger.info(f"选项: {options}")
+            
+            # 检查文件大小
+            from pathlib import Path
+            if not file_path.startswith(('http://', 'https://')):
+                file_size = Path(file_path).stat().st_size / 1024 / 1024
+                logger.info(f"文件大小: {file_size:.1f}MB")
+                
+                if file_size > 200:
+                    logger.info("文件超过200MB，需要拆分处理")
+                    return [TextContent(
+                        type="text",
+                        text=json.dumps({
+                            "status": "large_file",
+                            "error": f"文件超过200MB限制 ({file_size:.1f}MB)",
+                            "suggestion": "请使用命令行工具处理超大文件",
+                            "command": f"python3 tools/test_large_file_complete.py \"{file_path}\""
+                        }, ensure_ascii=False)
+                    )]
             
             logger.info("开始处理文件...")
             result = await processor['single'].process_file(file_path, **options)
