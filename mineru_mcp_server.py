@@ -43,8 +43,8 @@ script_dir = Path(__file__).parent
 sys.path.insert(0, str(script_dir))
 logger.info(f"✅ 项目路径: {script_dir}")
 
-# 延迟导入mineru_production
-logger.info("步骤3: 准备延迟导入mineru_production...")
+# 延迟导入mineru_async
+logger.info("步骤3: 准备延迟导入mineru_async...")
 processor = None
 
 # 创建MCP服务器
@@ -245,15 +245,15 @@ async def call_tool(name: str, arguments: dict) -> Sequence[TextContent | ImageC
     try:
         # 延迟导入处理器
         if processor is None:
-            logger.info("首次调用，导入MinerUProcessor...")
+            logger.info("首次调用，导入MinerUAsyncProcessor...")
             try:
-                from mineru_production import MinerUProcessor
-                logger.info("✅ MinerUProcessor导入成功")
+                from mineru_async import MinerUAsyncProcessor
+                logger.info("✅ MinerUAsyncProcessor导入成功")
                 
-                processor = MinerUProcessor(max_workers=10)
-                logger.info("✅ MinerUProcessor初始化成功")
+                processor = MinerUAsyncProcessor(max_workers=10)
+                logger.info("✅ MinerUAsyncProcessor初始化成功")
             except Exception as e:
-                logger.error(f"❌ MinerUProcessor导入/初始化失败: {e}")
+                logger.error(f"❌ MinerUAsyncProcessor导入/初始化失败: {e}")
                 logger.error(traceback.format_exc())
                 return [TextContent(
                     type="text",
