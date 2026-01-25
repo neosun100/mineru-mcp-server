@@ -16,6 +16,11 @@ __pycache__/
 step*.png
 .DS_Store
 
+# 虚拟环境
+.venv/
+venv/
+env/
+
 # 归档文件
 archive/
 
