@@ -245,15 +245,19 @@ async def call_tool(name: str, arguments: dict) -> Sequence[TextContent | ImageC
     try:
         # 延迟导入处理器
         if processor is None:
-            logger.info("首次调用，导入MinerUAsyncProcessor...")
+            logger.info("首次调用，导入处理器...")
             try:
                 from mineru_async import MinerUAsyncProcessor
-                logger.info("✅ MinerUAsyncProcessor导入成功")
+                from mineru_batch_async import BatchAsyncProcessor
+                logger.info("✅ 处理器导入成功")
                 
-                processor = MinerUAsyncProcessor(max_workers=10)
-                logger.info("✅ MinerUAsyncProcessor初始化成功")
+                processor = {
+                    'single': MinerUAsyncProcessor(max_workers=10),
+                    'batch': BatchAsyncProcessor(max_concurrent=3)
+                }
+                logger.info("✅ 处理器初始化成功")
             except Exception as e:
-                logger.error(f"❌ MinerUAsyncProcessor导入/初始化失败: {e}")
+                logger.error(f"❌ 处理器导入/初始化失败: {e}")
                 logger.error(traceback.format_exc())
                 return [TextContent(
                     type="text",
@@ -273,7 +277,7 @@ async def call_tool(name: str, arguments: dict) -> Sequence[TextContent | ImageC
             logger.info(f"选项: {options}")
             
             logger.info("开始处理文件...")
-            result = await processor.process_file(file_path, **options)
+            result = await processor['single'].process_file(file_path, **options)
             logger.info(f"处理结果: {result}")
             
             if result:
@@ -288,12 +292,47 @@ async def call_tool(name: str, arguments: dict) -> Sequence[TextContent | ImageC
                 )]
         
         elif name == "process_directory":
-            # 批量处理目录
+            logger.info("处理 process_directory 工具调用")
+            # 批量处理目录（使用批量异步并行）
             directory = arguments["directory"]
-            # TODO: 实现目录处理
+            pattern = arguments.get("file_pattern", "*.pdf")
+            
+            logger.info(f"目录: {directory}, 模式: {pattern}")
+            
+            # 扫描文件
+            dir_path = Path(directory).expanduser()
+            files = sorted([str(f) for f in dir_path.glob(pattern)])
+            
+            if not files:
+                return [TextContent(
+                    type="text",
+                    text=json.dumps({"status": "no_files", "message": f"未找到匹配的文件: {pattern}"})
+                )]
+            
+            logger.info(f"找到 {len(files)} 个文件")
+            
+            # 批量异步并行处理
+            results = await processor['batch'].process_files_parallel(files)
+            
+            # 汇总结果
+            summary = {
+                "total_files": len(results),
+                "success": sum(1 for r in results if r.status == 'done'),
+                "failed": sum(1 for r in results if r.status == 'failed'),
+                "results": [
+                    {
+                        "file": r.file_info['name'],
+                        "status": r.status,
+                        "output": r.result if r.result else None,
+                        "error": r.error if r.error else None
+                    }
+                    for r in results
+                ]
+            }
+            
             return [TextContent(
                 type="text",
-                text=json.dumps({"status": "todo", "message": "功能开发中"})
+                text=json.dumps(summary, indent=2, ensure_ascii=False)
             )]
         
         elif name == "process_urls":
