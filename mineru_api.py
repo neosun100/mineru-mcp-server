@@ -1,40 +1,35 @@
 #!/usr/bin/env python3
 """
-MinerU API 封装 - 负载均衡版本
-自动从5个账户中随机选择Token，实现负载均衡
+MinerU API 完整封装 - 支持所有官方API
+包含：智能解析、文档抽取、批量处理、负载均衡
 """
 import json
 import requests
 import random
-from typing import Optional, Dict, Any
+import time
+from typing import Optional, Dict, Any, List
+from datetime import datetime
 
 class MinerUAPI:
-    """MinerU API 客户端 - 支持多账户负载均衡 + 自动Token刷新"""
+    """MinerU API 完整客户端"""
     
     def __init__(self, tokens_file='all_tokens.json', auto_refresh=True):
-        """
-        初始化 MinerU API 客户端
-        
-        Args:
-            tokens_file: Token配置文件路径
-            auto_refresh: 是否自动检测并刷新过期Token
-        """
+        """初始化"""
         self.tokens_file = tokens_file
         self.auto_refresh = auto_refresh
         self.tokens = self._load_tokens()
         self.base_url = 'https://mineru.net/api/v4'
         
         if not self.tokens:
-            raise ValueError("未找到可用的Token，请先运行 batch_login.py")
+            raise ValueError("未找到Token，请先运行 batch_login.py")
         
-        print(f"✅ 已加载 {len(self.tokens)} 个账户的Token")
+        print(f"✅ 已加载 {len(self.tokens)} 个账户")
         
-        # 自动检测Token是否过期
         if self.auto_refresh:
             self._check_and_refresh_tokens()
     
     def _load_tokens(self) -> Dict:
-        """加载所有Token"""
+        """加载Token"""
         try:
             with open(self.tokens_file, 'r') as f:
                 return json.load(f)
@@ -42,60 +37,33 @@ class MinerUAPI:
             return {}
     
     def _check_token_expiry(self, token_name: str) -> bool:
-        """
-        检查Token是否过期
-        Token名称格式: token-20260125013352
-        从名称中提取创建时间，判断是否超过14天
-        """
+        """检查Token是否过期"""
         try:
-            # 提取时间戳: token-YYYYMMDDHHmmss
             timestamp_str = token_name.replace('token-', '')
-            from datetime import datetime, timedelta
-            
-            # 解析创建时间
             created_time = datetime.strptime(timestamp_str, '%Y%m%d%H%M%S')
-            
-            # 计算是否过期（14天）
-            now = datetime.now()
-            days_passed = (now - created_time).days
-            
-            return days_passed >= 13  # 提前1天刷新
+            days_passed = (datetime.now() - created_time).days
+            return days_passed >= 13
         except:
             return False
     
     def _check_and_refresh_tokens(self):
-        """检查所有Token，如果有过期的则提示刷新"""
-        expired_accounts = []
+        """检查Token过期"""
+        expired = [info['name'] for email, info in self.tokens.items() 
+                  if self._check_token_expiry(info['token_name'])]
         
-        for email, token_info in self.tokens.items():
-            token_name = token_info['token_name']
-            if self._check_token_expiry(token_name):
-                expired_accounts.append(token_info['name'])
-        
-        if expired_accounts:
-            print(f"\n⚠️  检测到 {len(expired_accounts)} 个账户Token即将过期:")
-            for name in expired_accounts:
-                print(f"   - {name}")
-            print(f"\n💡 建议运行: python3 batch_login.py")
-            print(f"   或运行: python3 login_complete.py 单独更新\n")
+        if expired:
+            print(f"\n⚠️  {len(expired)} 个账户Token即将过期")
+            print(f"💡 请运行: python3 batch_login.py\n")
         else:
-            print("✅ 所有Token有效期正常")
+            print("✅ 所有Token有效")
     
     def _get_random_token(self) -> tuple:
-        """随机选择一个Token（负载均衡）"""
+        """随机选择Token（负载均衡）"""
         email = random.choice(list(self.tokens.keys()))
-        token_info = self.tokens[email]
-        return email, token_info['token']
+        return email, self.tokens[email]['token']
     
-    def _make_request(self, method: str, endpoint: str, **kwargs) -> requests.Response:
-        """
-        发送API请求（自动负载均衡）
-        
-        Args:
-            method: HTTP方法（GET/POST/DELETE等）
-            endpoint: API端点
-            **kwargs: 其他请求参数
-        """
+    def _request(self, method: str, endpoint: str, **kwargs) -> requests.Response:
+        """发送请求（自动负载均衡）"""
         email, token = self._get_random_token()
         
         headers = kwargs.get('headers', {})
@@ -104,101 +72,237 @@ class MinerUAPI:
         kwargs['headers'] = headers
         
         url = f"{self.base_url}/{endpoint}"
-        
-        print(f"🔄 使用账户: {email}")
-        
-        response = requests.request(method, url, **kwargs)
-        return response
+        return requests.request(method, url, **kwargs)
     
-    def parse_pdf(self, pdf_url: str, **options) -> Dict[str, Any]:
+    # ==================== 智能解析 API ====================
+    
+    def create_task(self, file_url: str, model_version='vlm', **options) -> Optional[str]:
         """
-        解析PDF文档
+        创建单个文件解析任务
         
         Args:
-            pdf_url: PDF文件URL
-            **options: 解析选项
+            file_url: 文件URL（支持PDF/DOC/DOCX/PPT/PPTX/图片/HTML）
+            model_version: 模型版本（pipeline/vlm/MinerU-HTML）
+            **options: 其他选项（is_ocr, enable_formula, enable_table等）
         
         Returns:
-            解析结果
+            task_id 或 None
         """
-        print(f"📄 解析PDF: {pdf_url}")
-        
         data = {
-            'url': pdf_url,
+            'url': file_url,
+            'model_version': model_version,
             **options
         }
         
-        response = self._make_request('POST', 'parse', json=data, timeout=300)
+        response = self._request('POST', 'extract/task', json=data, timeout=30)
         
         if response.status_code == 200:
-            print("✅ 解析成功")
-            return response.json()
-        else:
-            print(f"❌ 解析失败: {response.status_code}")
-            print(f"响应: {response.text}")
-            return None
+            result = response.json()
+            if result['code'] == 0:
+                task_id = result['data']['task_id']
+                print(f"✅ 任务已创建: {task_id}")
+                return task_id
+        
+        print(f"❌ 创建失败: {response.text}")
+        return None
     
-    def get_parse_status(self, task_id: str) -> Dict[str, Any]:
+    def get_task_result(self, task_id: str) -> Optional[Dict]:
         """
-        查询解析任务状态
+        获取任务结果
         
         Args:
             task_id: 任务ID
         
         Returns:
-            任务状态
+            任务结果
         """
-        response = self._make_request('GET', f'parse/{task_id}')
+        response = self._request('GET', f'extract/task/{task_id}', timeout=30)
         
         if response.status_code == 200:
-            return response.json()
-        else:
-            return None
+            result = response.json()
+            if result['code'] == 0:
+                return result['data']
+        
+        return None
     
-    def list_tokens(self) -> Dict[str, Any]:
-        """列出当前使用账户的所有Token"""
-        response = self._make_request('GET', 'tokens')
+    def parse_and_wait(self, file_url: str, model_version='vlm', 
+                       max_wait=300, **options) -> Optional[Dict]:
+        """
+        解析文件并等待结果
+        
+        Args:
+            file_url: 文件URL
+            model_version: 模型版本
+            max_wait: 最大等待时间（秒）
+            **options: 其他选项
+        
+        Returns:
+            解析结果
+        """
+        print(f"📄 开始解析: {file_url}")
+        
+        # 创建任务
+        task_id = self.create_task(file_url, model_version, **options)
+        if not task_id:
+            return None
+        
+        # 等待完成
+        print("⏳ 等待解析完成...")
+        start_time = time.time()
+        
+        while time.time() - start_time < max_wait:
+            result = self.get_task_result(task_id)
+            
+            if result:
+                state = result.get('state')
+                
+                if state == 'done':
+                    print(f"✅ 解析完成")
+                    print(f"📦 结果: {result.get('full_zip_url')}")
+                    return result
+                elif state == 'failed':
+                    print(f"❌ 解析失败: {result.get('err_msg')}")
+                    return None
+                elif state == 'running':
+                    progress = result.get('extract_progress', {})
+                    print(f"  进度: {progress.get('extracted_pages', 0)}/{progress.get('total_pages', 0)}")
+            
+            time.sleep(5)
+        
+        print("❌ 超时")
+        return None
+    
+    # ==================== 批量解析 API ====================
+    
+    def create_batch_task(self, files: List[Dict], model_version='vlm', **options) -> Optional[str]:
+        """
+        创建批量解析任务
+        
+        Args:
+            files: 文件列表 [{"url": "...", "data_id": "..."}]
+            model_version: 模型版本
+            **options: 其他选项
+        
+        Returns:
+            batch_id 或 None
+        """
+        data = {
+            'files': files,
+            'model_version': model_version,
+            **options
+        }
+        
+        response = self._request('POST', 'extract/task/batch', json=data, timeout=30)
         
         if response.status_code == 200:
-            return response.json()
-        else:
-            return None
+            result = response.json()
+            if result['code'] == 0:
+                batch_id = result['data']['batch_id']
+                print(f"✅ 批量任务已创建: {batch_id}")
+                return batch_id
+        
+        print(f"❌ 创建失败: {response.text}")
+        return None
     
-    def get_account_info(self) -> Dict[str, Any]:
-        """获取当前使用账户的信息"""
-        email, _ = self._get_random_token()
-        return self.tokens[email]
+    def get_batch_result(self, batch_id: str) -> Optional[Dict]:
+        """
+        获取批量任务结果
+        
+        Args:
+            batch_id: 批量任务ID
+        
+        Returns:
+            批量结果
+        """
+        response = self._request('GET', f'extract-results/batch/{batch_id}', timeout=30)
+        
+        if response.status_code == 200:
+            result = response.json()
+            if result['code'] == 0:
+                return result['data']
+        
+        return None
+    
+    # ==================== 文件上传 API ====================
+    
+    def get_upload_urls(self, files: List[Dict], model_version='vlm', **options) -> Optional[Dict]:
+        """
+        获取文件上传链接
+        
+        Args:
+            files: 文件列表 [{"name": "demo.pdf", "data_id": "..."}]
+            model_version: 模型版本
+            **options: 其他选项
+        
+        Returns:
+            上传链接信息
+        """
+        data = {
+            'files': files,
+            'model_version': model_version,
+            **options
+        }
+        
+        response = self._request('POST', 'file-urls/batch', json=data, timeout=30)
+        
+        if response.status_code == 200:
+            result = response.json()
+            if result['code'] == 0:
+                return result['data']
+        
+        return None
+    
+    def upload_and_parse(self, file_path: str, model_version='vlm', **options) -> Optional[str]:
+        """
+        上传文件并解析
+        
+        Args:
+            file_path: 本地文件路径
+            model_version: 模型版本
+            **options: 其他选项
+        
+        Returns:
+            batch_id 或 None
+        """
+        import os
+        file_name = os.path.basename(file_path)
+        
+        print(f"📤 上传文件: {file_name}")
+        
+        # 获取上传链接
+        upload_info = self.get_upload_urls([{"name": file_name}], model_version, **options)
+        
+        if not upload_info:
+            return None
+        
+        batch_id = upload_info['batch_id']
+        upload_url = upload_info['file_urls'][0]
+        
+        # 上传文件
+        with open(file_path, 'rb') as f:
+            response = requests.put(upload_url, data=f, timeout=300)
+        
+        if response.status_code == 200:
+            print(f"✅ 上传成功，batch_id: {batch_id}")
+            return batch_id
+        else:
+            print(f"❌ 上传失败: {response.status_code}")
+            return None
 
 # 使用示例
 if __name__ == '__main__':
-    # 初始化API客户端
     api = MinerUAPI()
     
     print("\n" + "="*60)
-    print("MinerU API 测试")
+    print("MinerU API 功能演示")
     print("="*60)
     
-    # 测试1: 列出Token
-    print("\n测试1: 列出Token")
-    result = api.list_tokens()
-    if result and 'data' in result:
-        print(f"✅ 当前账户有 {result['data']['total']} 个Token")
-    else:
-        print(f"⚠️  响应: {result}")
+    # 示例1: 解析在线PDF
+    print("\n示例1: 解析在线PDF")
+    pdf_url = "https://cdn-mineru.openxlab.org.cn/demo/example.pdf"
+    result = api.parse_and_wait(pdf_url, model_version='vlm')
     
-    # 测试2: 获取账户信息
-    print("\n测试2: 获取账户信息")
-    info = api.get_account_info()
-    print(f"✅ 账户: {info['name']}")
-    print(f"   Token: {info['token_name']}")
-    print(f"   过期: {info['expired_at']}")
-    
-    # 测试3: 负载均衡测试
-    print("\n测试3: 负载均衡测试（连续5次请求）")
-    for i in range(5):
-        print(f"\n请求 {i+1}:")
-        api.list_tokens()
+    if result:
+        print(f"📦 下载结果: {result.get('full_zip_url')}")
     
     print("\n" + "="*60)
-    print("✅ 测试完成")
-    print("="*60)
