@@ -207,12 +207,18 @@ class MinerUClient:
     """MinerU API 客户端"""
     
     def __init__(self, tokens_file='all_tokens.json'):
-        self.tokens_file = tokens_file
+        # 如果是相对路径，转换为绝对路径
+        if not Path(tokens_file).is_absolute():
+            # 使用脚本所在目录
+            script_dir = Path(__file__).parent
+            tokens_file = script_dir / tokens_file
+        
+        self.tokens_file = str(tokens_file)
         self.tokens = self._load_tokens()
         self.base_url = 'https://mineru.net/api/v4'
         
         if not self.tokens:
-            raise ValueError("未找到Token，请先运行 batch_login.py")
+            raise ValueError(f"未找到Token文件: {self.tokens_file}")
         
         print(f"✅ 已加载 {len(self.tokens)} 个账户")
     

@@ -208,9 +208,22 @@ async def call_tool(name: str, arguments: dict) -> Sequence[TextContent | ImageC
     """处理工具调用"""
     global processor
     
-    # 初始化处理器
-    if processor is None:
-        processor = MinerUProcessor(max_workers=10)
+    try:
+        # 初始化处理器（使用绝对路径）
+        if processor is None:
+            script_dir = Path(__file__).parent
+            tokens_file = script_dir / 'all_tokens.json'
+            
+            if not tokens_file.exists():
+                return [TextContent(
+                    type="text",
+                    text=json.dumps({
+                        "error": f"Token文件不存在: {tokens_file}",
+                        "hint": "请先运行: cd /Users/jiasunm/Code/GenAI/MinerU-Token && python3 batch_login.py"
+                    }, ensure_ascii=False)
+                )]
+            
+            processor = MinerUProcessor(max_workers=10)
     
     if name == "process_document":
         # 处理单个文档
