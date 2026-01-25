@@ -528,28 +528,37 @@ class MinerUProcessor:
             return None
         
         # 2. 处理本地文件：上传到CDN
-        async with aiohttp.ClientSession() as session:
-            if not file_info['is_url']:
-                print(f"\n📤 上传本地文件...")
-                
-                # 设置默认参数
-                upload_options = {
-                    'model_version': options.get('model_version', 'vlm'),
-                    'enable_formula': options.get('enable_formula', True),
-                    'enable_table': options.get('enable_table', True)
-                }
-                
-                batch_id = await self.client.upload_local_file(
-                    session,
-                    file_path,
-                    **upload_options
-                )
-                
-                if not batch_id:
-                    print("❌ 文件上传失败")
-                    return None
-                
-                print(f"✅ 文件已上传，batch_id: {batch_id}")
+        logger.info("步骤2: 开始处理本地文件上传...")
+        try:
+            async with aiohttp.ClientSession() as session:
+                if not file_info['is_url']:
+                    logger.info("本地文件，需要上传")
+                    print(f"\n📤 上传本地文件...")
+                    
+                    # 设置默认参数
+                    upload_options = {
+                        'model_version': options.get('model_version', 'vlm'),
+                        'enable_formula': options.get('enable_formula', True),
+                        'enable_table': options.get('enable_table', True)
+                    }
+                    logger.info(f"上传选项: {upload_options}")
+                    
+                    batch_id = await self.client.upload_local_file(
+                        session,
+                        file_path,
+                        **upload_options
+                    )
+                    
+                    logger.info(f"上传结果: batch_id={batch_id}")
+                    
+                    if not batch_id:
+                        logger.error("文件上传失败")
+                        print("❌ 文件上传失败")
+                        return None
+                    
+                    print(f"✅ 文件已上传，batch_id: {batch_id}")
+                else:
+                    logger.info("URL文件，无需上传")
             
             # 3. 等待处理完成
             if batch_id:
@@ -643,6 +652,11 @@ class MinerUProcessor:
                     'images': str(images_dir) if images_dir.exists() else None
                 }
             }
+        
+        except Exception as e:
+            logger.error(f"处理阶段异常: {e}", exc_info=True)
+            print(f"❌ 处理失败: {e}")
+            return None
     
     async def _process_chunk(self, session: aiohttp.ClientSession,
                             file_url: str, chunk: Dict, options: Dict) -> Optional[Dict]:
