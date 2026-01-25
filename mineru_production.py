@@ -487,37 +487,45 @@ class MinerUProcessor:
                           **options) -> Optional[Dict]:
         """
         处理单个文件（完整流程）- 支持本地文件和URL
-        
-        Args:
-            file_path: 文件路径或URL
-            output_dir: 输出目录
-            **options: API参数（model_version, is_ocr等）
-        
-        Returns:
-            处理结果
         """
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        logger.info(f"process_file() 开始: {file_path}")
         print(f"\n📄 处理: {file_path}")
         
         # 1. 验证文件或URL
-        if FileValidator.is_url(file_path):
-            print("🌐 检测到URL，验证中...")
-            async with aiohttp.ClientSession() as session:
-                is_valid, error, file_info = await FileValidator.validate_url(session, file_path)
-            file_url = file_path  # URL直接使用
-            batch_id = None
-        else:
-            print("📁 检测到本地文件，验证中...")
-            is_valid, error, file_info = FileValidator.validate_file(file_path)
-            file_url = None  # 本地文件需要上传
-            batch_id = None
+        try:
+            if FileValidator.is_url(file_path):
+                logger.info("检测到URL")
+                print("🌐 检测到URL，验证中...")
+                async with aiohttp.ClientSession() as session:
+                    is_valid, error, file_info = await FileValidator.validate_url(session, file_path)
+                file_url = file_path
+                batch_id = None
+            else:
+                logger.info("检测到本地文件")
+                print("📁 检测到本地文件，验证中...")
+                is_valid, error, file_info = FileValidator.validate_file(file_path)
+                file_url = None
+                batch_id = None
+            
+            logger.info(f"验证结果: is_valid={is_valid}, error={error}")
+            
+            if not is_valid:
+                logger.error(f"文件验证失败: {error}")
+                print(f"❌ {error}")
+                return None
+            
+            logger.info(f"文件信息: {file_info}")
+            print(f"✅ 验证通过: {file_info['format'].upper()}, {file_info['size']/1024/1024:.1f}MB")
+            if file_info.get('pages'):
+                print(f"   页数: {file_info['pages']}")
         
-        if not is_valid:
-            print(f"❌ {error}")
+        except Exception as e:
+            logger.error(f"验证阶段异常: {e}", exc_info=True)
+            print(f"❌ 验证失败: {e}")
             return None
-        
-        print(f"✅ 验证通过: {file_info['format'].upper()}, {file_info['size']/1024/1024:.1f}MB")
-        if file_info.get('pages'):
-            print(f"   页数: {file_info['pages']}")
         
         # 2. 处理本地文件：上传到CDN
         async with aiohttp.ClientSession() as session:
