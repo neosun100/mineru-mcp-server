@@ -352,11 +352,17 @@ class MinerUAsyncProcessor:
                     logger.info("开始上传本地文件")
                     print(f"\n📤 上传本地文件...")
                     
+                    # 智能参数设置
                     upload_options = {
                         'model_version': options.get('model_version', 'vlm'),
                         'enable_formula': options.get('enable_formula', True),
                         'enable_table': options.get('enable_table', True)
+                        # 不设置 language，让API自动检测
                     }
+                    
+                    # HTML文件使用专用模型
+                    if file_info['format'] == 'html':
+                        upload_options['model_version'] = 'MinerU-HTML'
                     
                     batch_id = await self.client.upload_file(session, file_path, **upload_options)
                     
