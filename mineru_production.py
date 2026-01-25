@@ -27,7 +27,7 @@ except ImportError:
 
 
 class FileValidator:
-    """文件验证器"""
+    """文件验证器 - 支持本地文件和URL"""
     
     MAX_SIZE = 200 * 1024 * 1024  # 200MB
     MAX_PAGES = 600
@@ -45,9 +45,71 @@ class FileValidator:
     }
     
     @staticmethod
+    def is_url(path: str) -> bool:
+        """判断是否为URL"""
+        return path.startswith(('http://', 'https://'))
+    
+    @staticmethod
+    async def validate_url(session: aiohttp.ClientSession, url: str) -> Tuple[bool, str, Dict]:
+        """
+        验证URL
+        
+        Returns:
+            (is_valid, error_msg, file_info)
+        """
+        try:
+            # HEAD请求获取文件信息
+            async with session.head(url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                if resp.status != 200:
+                    return False, f"URL无法访问: {resp.status}", {}
+                
+                # 获取文件大小
+                size = int(resp.headers.get('content-length', 0))
+                if size > FileValidator.MAX_SIZE:
+                    return False, f"文件超过200MB限制 ({size / 1024 / 1024:.1f}MB)", {}
+                
+                # 从URL或Content-Type推断格式
+                content_type = resp.headers.get('content-type', '')
+                format = FileValidator._guess_format_from_url(url, content_type)
+                
+                if not format:
+                    return False, f"无法识别文件格式", {}
+                
+                file_info = {
+                    'path': url,
+                    'name': Path(url).name or 'document',
+                    'size': size,
+                    'format': format,
+                    'is_url': True,
+                    'pages': None,  # URL无法预先获取页数
+                    'needs_split': False  # 使用page_ranges参数
+                }
+                
+                return True, "", file_info
+        
+        except Exception as e:
+            return False, f"URL验证失败: {e}", {}
+    
+    @staticmethod
+    def _guess_format_from_url(url: str, content_type: str) -> Optional[str]:
+        """从URL和Content-Type推断格式"""
+        # 从URL扩展名推断
+        url_lower = url.lower()
+        for ext in FileValidator.SUPPORTED_FORMATS.keys():
+            if url_lower.endswith(f'.{ext}'):
+                return ext
+        
+        # 从Content-Type推断
+        for ext, mime in FileValidator.SUPPORTED_FORMATS.items():
+            if mime in content_type:
+                return ext
+        
+        return None
+    
+    @staticmethod
     def validate_file(file_path: str) -> Tuple[bool, str, Dict]:
         """
-        验证文件
+        验证本地文件
         
         Returns:
             (is_valid, error_msg, file_info)
@@ -79,6 +141,7 @@ class FileValidator:
             'name': path.name,
             'size': size,
             'format': suffix,
+            'is_url': False,
             'pages': pages,
             'needs_split': pages > FileValidator.MAX_PAGES if pages else False
         }
@@ -334,34 +397,42 @@ class MinerUProcessor:
     async def process_file(self, file_path: str, output_dir: str = "./output",
                           **options) -> Optional[Dict]:
         """
-        处理单个文件（完整流程）
+        处理单个文件（完整流程）- 支持本地文件和URL
         
         Args:
-            file_path: 文件路径
+            file_path: 文件路径或URL
             output_dir: 输出目录
             **options: API参数（model_version, is_ocr等）
         
         Returns:
             处理结果
         """
-        print(f"\n📄 处理文件: {file_path}")
+        print(f"\n📄 处理: {file_path}")
         
-        # 1. 验证文件
-        is_valid, error, file_info = FileValidator.validate_file(file_path)
+        # 1. 验证文件或URL
+        if FileValidator.is_url(file_path):
+            print("🌐 检测到URL，验证中...")
+            async with aiohttp.ClientSession() as session:
+                is_valid, error, file_info = await FileValidator.validate_url(session, file_path)
+        else:
+            print("📁 检测到本地文件，验证中...")
+            is_valid, error, file_info = FileValidator.validate_file(file_path)
+        
         if not is_valid:
             print(f"❌ {error}")
             return None
         
-        print(f"✅ 文件验证通过: {file_info['size']/1024/1024:.1f}MB, {file_info['pages']}页")
+        print(f"✅ 验证通过: {file_info['format'].upper()}, {file_info['size']/1024/1024:.1f}MB")
         
         # 2. 创建分片配置
-        chunks = SmartChunker.create_chunks_with_ranges(file_info)
+        if file_info['is_url']:
+            # URL直接使用，通过page_ranges参数拆分
+            chunks = SmartChunker.create_chunks_with_ranges(file_info)
+        else:
+            # 本地文件也使用page_ranges
+            chunks = SmartChunker.create_chunks_with_ranges(file_info)
         
-        # 3. 上传文件（TODO: 实现文件上传）
-        print("\n⚠️  注意: 需要先上传文件到CDN")
-        file_url = f"https://example.com/{file_info['name']}"
-        
-        # 4. 并行处理所有分片
+        # 3. 处理所有分片
         print(f"\n🚀 开始处理 {len(chunks)} 个分片...")
         
         async with aiohttp.ClientSession() as session:
@@ -372,12 +443,15 @@ class MinerUProcessor:
                 if chunk['page_ranges']:
                     task_options['page_ranges'] = chunk['page_ranges']
                 
+                # 使用原始路径（URL或本地文件路径）
+                file_url = file_info['path']
+                
                 task = self._process_chunk(session, file_url, chunk, task_options)
                 tasks.append(task)
             
             results = await asyncio.gather(*tasks)
         
-        # 5. 下载并合并结果
+        # 4. 下载并合并结果
         success_results = [r for r in results if r]
         
         if not success_results:
@@ -403,14 +477,16 @@ class MinerUProcessor:
                 if extracted:
                     chunk_dirs.append(extracted)
         
-        # 6. 合并
-        file_name = Path(file_path).stem
+        # 5. 合并
+        file_name = file_info['name'].rsplit('.', 1)[0]  # 去除扩展名
         md_file = output_path / f"{file_name}_merged.md"
         
         ResultProcessor.merge_results(chunk_dirs, str(md_file))
         ResultProcessor.merge_images(chunk_dirs, output_dir)
         
         return {
+            'source': file_path,
+            'source_type': 'url' if file_info['is_url'] else 'file',
             'total_chunks': len(chunks),
             'success': len(success_results),
             'failed': len(chunks) - len(success_results),
