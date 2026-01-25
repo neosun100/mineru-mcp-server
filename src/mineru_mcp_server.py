@@ -284,13 +284,19 @@ async def call_tool(name: str, arguments: dict) -> Sequence[TextContent | ImageC
                 
                 if file_size > 200:
                     logger.info("文件超过200MB，需要拆分处理")
+                    
+                    # 获取项目根目录
+                    project_root = Path(__file__).parent.parent
+                    
                     return [TextContent(
                         type="text",
                         text=json.dumps({
                             "status": "large_file",
+                            "file_size_mb": round(file_size, 1),
                             "error": f"文件超过200MB限制 ({file_size:.1f}MB)",
                             "suggestion": "请使用命令行工具处理超大文件",
-                            "command": f"python3 tools/test_large_file_complete.py \"{file_path}\""
+                            "command": f"cd {project_root} && python3 tools/test_large_file_complete.py \"{file_path}\"",
+                            "project_path": str(project_root)
                         }, ensure_ascii=False)
                     )]
             
