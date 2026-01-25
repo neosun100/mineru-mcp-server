@@ -288,28 +288,111 @@ class MinerUClient:
                 return result['data']
             return None
     
-    async def wait_for_completion(self, session: aiohttp.ClientSession,
-                                  task_id: str, max_wait: int = 600) -> Optional[Dict]:
-        """等待任务完成"""
+    async def upload_local_file(self, session: aiohttp.ClientSession,
+                               file_path: str, **options) -> Optional[str]:
+        """
+        上传本地文件到CDN
+        
+        Args:
+            file_path: 本地文件路径
+            **options: API参数
+        
+        Returns:
+            batch_id
+        """
+        token = self._get_random_token()
+        headers = {
+            'authorization': f'Bearer {token}',
+            'content-type': 'application/json'
+        }
+        
+        file_name = Path(file_path).name
+        
+        # 1. 获取上传链接
+        data = {
+            'files': [{'name': file_name}],
+            **options
+        }
+        
+        async with session.post(
+            f"{self.base_url}/file-urls/batch",
+            headers=headers,
+            json=data,
+            timeout=aiohttp.ClientTimeout(total=30)
+        ) as resp:
+            result = await resp.json()
+            
+            if result['code'] != 0:
+                print(f"❌ 获取上传链接失败: {result.get('msg')}")
+                return None
+            
+            batch_id = result['data']['batch_id']
+            upload_url = result['data']['file_urls'][0]
+            print(f"✅ 获取上传链接成功")
+        
+        # 2. 上传文件
+        print(f"📤 上传文件中...")
+        with open(file_path, 'rb') as f:
+            file_data = f.read()
+        
+        async with session.put(
+            upload_url,
+            data=file_data,
+            timeout=aiohttp.ClientTimeout(total=300)
+        ) as resp:
+            if resp.status == 200:
+                print(f"✅ 文件上传成功")
+                return batch_id
+            else:
+                print(f"❌ 文件上传失败: {resp.status}")
+                return None
+    
+    async def get_batch_result(self, session: aiohttp.ClientSession,
+                               batch_id: str) -> Optional[List[Dict]]:
+        """获取批量任务结果"""
+        token = self._get_random_token()
+        headers = {
+            'authorization': f'Bearer {token}'
+        }
+        
+        async with session.get(
+            f"{self.base_url}/extract-results/batch/{batch_id}",
+            headers=headers,
+            timeout=aiohttp.ClientTimeout(total=30)
+        ) as resp:
+            result = await resp.json()
+            
+            if result['code'] == 0:
+                return result['data']['extract_result']
+            return None
+    
+    async def wait_for_batch_completion(self, session: aiohttp.ClientSession,
+                                       batch_id: str, max_wait: int = 600) -> Optional[List[Dict]]:
+        """等待批量任务完成"""
         start_time = time.time()
         
         while time.time() - start_time < max_wait:
-            result = await self.get_task_result(session, task_id)
+            results = await self.get_batch_result(session, batch_id)
             
-            if result:
-                state = result.get('state')
+            if results:
+                all_done = True
+                for result in results:
+                    state = result.get('state')
+                    
+                    if state == 'failed':
+                        print(f"❌ 文件失败: {result.get('file_name')} - {result.get('err_msg')}")
+                        return None
+                    elif state in ['pending', 'running', 'waiting-file', 'converting']:
+                        all_done = False
+                        if state == 'running':
+                            progress = result.get('extract_progress', {})
+                            extracted = progress.get('extracted_pages', 0)
+                            total = progress.get('total_pages', 0)
+                            if total > 0:
+                                print(f"  进度: {extracted}/{total}页", end='\r')
                 
-                if state == 'done':
-                    return result
-                elif state == 'failed':
-                    print(f"❌ 任务失败: {result.get('err_msg')}")
-                    return None
-                elif state == 'running':
-                    progress = result.get('extract_progress', {})
-                    extracted = progress.get('extracted_pages', 0)
-                    total = progress.get('total_pages', 0)
-                    if total > 0:
-                        print(f"  进度: {extracted}/{total}页", end='\r')
+                if all_done:
+                    return results
             
             await asyncio.sleep(5)
         
@@ -420,87 +503,138 @@ class MinerUProcessor:
             print("🌐 检测到URL，验证中...")
             async with aiohttp.ClientSession() as session:
                 is_valid, error, file_info = await FileValidator.validate_url(session, file_path)
+            file_url = file_path  # URL直接使用
+            batch_id = None
         else:
             print("📁 检测到本地文件，验证中...")
             is_valid, error, file_info = FileValidator.validate_file(file_path)
+            file_url = None  # 本地文件需要上传
+            batch_id = None
         
         if not is_valid:
             print(f"❌ {error}")
             return None
         
         print(f"✅ 验证通过: {file_info['format'].upper()}, {file_info['size']/1024/1024:.1f}MB")
+        if file_info.get('pages'):
+            print(f"   页数: {file_info['pages']}")
         
-        # 2. 创建分片配置
-        if file_info['is_url']:
-            # URL直接使用，通过page_ranges参数拆分
-            chunks = SmartChunker.create_chunks_with_ranges(file_info)
-        else:
-            # 本地文件也使用page_ranges
-            chunks = SmartChunker.create_chunks_with_ranges(file_info)
-        
-        # 3. 处理所有分片
-        print(f"\n🚀 开始处理 {len(chunks)} 个分片...")
-        
+        # 2. 处理本地文件：上传到CDN
         async with aiohttp.ClientSession() as session:
-            tasks = []
-            for chunk in chunks:
-                # 创建任务时传入page_ranges
-                task_options = {**options}
-                if chunk['page_ranges']:
-                    task_options['page_ranges'] = chunk['page_ranges']
+            if not file_info['is_url']:
+                print(f"\n📤 上传本地文件...")
                 
-                # 使用原始路径（URL或本地文件路径）
-                file_url = file_info['path']
+                # 设置默认参数
+                upload_options = {
+                    'model_version': options.get('model_version', 'vlm'),
+                    'enable_formula': options.get('enable_formula', True),
+                    'enable_table': options.get('enable_table', True)
+                }
                 
-                task = self._process_chunk(session, file_url, chunk, task_options)
-                tasks.append(task)
-            
-            results = await asyncio.gather(*tasks)
-        
-        # 4. 下载并合并结果
-        success_results = [r for r in results if r]
-        
-        if not success_results:
-            print("❌ 所有分片处理失败")
-            return None
-        
-        print(f"\n📥 下载并合并结果...")
-        output_path = Path(output_dir)
-        output_path.mkdir(exist_ok=True, parents=True)
-        
-        chunk_dirs = []
-        async with aiohttp.ClientSession() as session:
-            for i, result in enumerate(success_results, 1):
-                chunk_dir = output_path / f"chunk_{i}"
-                chunk_dir.mkdir(exist_ok=True)
-                
-                extracted = await ResultProcessor.download_and_extract(
+                batch_id = await self.client.upload_local_file(
                     session,
-                    result['full_zip_url'],
-                    str(chunk_dir)
+                    file_path,
+                    **upload_options
                 )
                 
-                if extracted:
-                    chunk_dirs.append(extracted)
-        
-        # 5. 合并
-        file_name = file_info['name'].rsplit('.', 1)[0]  # 去除扩展名
-        md_file = output_path / f"{file_name}_merged.md"
-        
-        ResultProcessor.merge_results(chunk_dirs, str(md_file))
-        ResultProcessor.merge_images(chunk_dirs, output_dir)
-        
-        return {
-            'source': file_path,
-            'source_type': 'url' if file_info['is_url'] else 'file',
-            'total_chunks': len(chunks),
-            'success': len(success_results),
-            'failed': len(chunks) - len(success_results),
-            'output': {
-                'markdown': str(md_file),
-                'images': str(output_path / "images")
+                if not batch_id:
+                    print("❌ 文件上传失败")
+                    return None
+                
+                print(f"✅ 文件已上传，batch_id: {batch_id}")
+            
+            # 3. 等待处理完成
+            if batch_id:
+                # 本地文件：使用batch_id查询
+                print(f"\n⏳ 等待处理完成...")
+                results = await self.client.wait_for_batch_completion(session, batch_id)
+                
+                if not results or len(results) == 0:
+                    print("❌ 处理失败")
+                    return None
+                
+                result = results[0]  # 单文件只有一个结果
+                
+                if result.get('state') != 'done':
+                    print(f"❌ 处理失败: {result.get('err_msg')}")
+                    return None
+                
+                full_zip_url = result.get('full_zip_url')
+            else:
+                # URL：使用page_ranges处理
+                chunks = SmartChunker.create_chunks_with_ranges(file_info)
+                
+                print(f"\n🚀 开始处理 {len(chunks)} 个分片...")
+                
+                tasks = []
+                for chunk in chunks:
+                    task_options = {**options}
+                    if chunk['page_ranges']:
+                        task_options['page_ranges'] = chunk['page_ranges']
+                    
+                    task = self._process_chunk(session, file_url, chunk, task_options)
+                    tasks.append(task)
+                
+                chunk_results = await asyncio.gather(*tasks)
+                
+                # 这里简化：只处理第一个分片的结果
+                success_results = [r for r in chunk_results if r]
+                if not success_results:
+                    print("❌ 所有分片处理失败")
+                    return None
+                
+                full_zip_url = success_results[0]['full_zip_url']
+            
+            # 4. 下载并解压结果
+            print(f"\n📥 下载并解压结果...")
+            output_path = Path(output_dir)
+            if not file_info['is_url']:
+                # 本地文件：输出到同目录
+                output_path = Path(file_path).parent
+            
+            output_path.mkdir(exist_ok=True, parents=True)
+            
+            chunk_dir = output_path / f"{Path(file_path).stem}_result"
+            chunk_dir.mkdir(exist_ok=True)
+            
+            extracted = await ResultProcessor.download_and_extract(
+                session,
+                full_zip_url,
+                str(chunk_dir)
+            )
+            
+            if not extracted:
+                print("❌ 下载解压失败")
+                return None
+            
+            # 5. 整理输出
+            file_name = Path(file_path).stem
+            md_file = output_path / f"{file_name}.md"
+            images_dir = output_path / f"{file_name}_images"
+            
+            # 复制Markdown
+            source_md = ResultProcessor.find_markdown(extracted)
+            if source_md:
+                shutil.copy(source_md, md_file)
+                print(f"✅ Markdown: {md_file}")
+            
+            # 复制图片
+            source_images = Path(extracted) / "images"
+            if source_images.exists():
+                if images_dir.exists():
+                    shutil.rmtree(images_dir)
+                shutil.copytree(source_images, images_dir)
+                image_count = len(list(images_dir.glob("*")))
+                print(f"✅ 图片: {images_dir} ({image_count}个)")
+            
+            return {
+                'source': file_path,
+                'source_type': 'url' if file_info['is_url'] else 'file',
+                'output': {
+                    'markdown': str(md_file),
+                    'images': str(images_dir) if images_dir.exists() else None
+                }
             }
-        }
     
     async def _process_chunk(self, session: aiohttp.ClientSession,
                             file_url: str, chunk: Dict, options: Dict) -> Optional[Dict]:
