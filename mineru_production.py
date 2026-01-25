@@ -300,7 +300,7 @@ class MinerUClient:
         Returns:
             batch_id
         """
-        import requests  # 使用requests而不是aiohttp上传
+        import niquests as requests  # 使用requests而不是aiohttp上传
         
         token = self._get_random_token()
         headers = {
@@ -347,7 +347,7 @@ class MinerUClient:
     async def get_batch_result(self, session: aiohttp.ClientSession,
                                batch_id: str) -> Optional[List[Dict]]:
         """获取批量任务结果"""
-        import requests  # 使用requests
+        import niquests as requests  # 使用requests
         
         token = self._get_random_token()
         headers = {
@@ -405,7 +405,7 @@ class ResultProcessor:
     @staticmethod
     async def download_and_extract(zip_url: str, output_dir: str) -> Optional[str]:
         """下载并解压结果"""
-        import requests  # 使用requests
+        import niquests as requests  # 使用requests
         
         try:
             # 下载

@@ -4,7 +4,7 @@ MinerU API 完整封装 - 支持所有官方API
 包含：智能解析、文档抽取、批量处理、负载均衡
 """
 import json
-import requests
+import niquests as requests
 import random
 import time
 from typing import Optional, Dict, Any, List
