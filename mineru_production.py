@@ -300,6 +300,8 @@ class MinerUClient:
         Returns:
             batch_id
         """
+        import requests  # 使用requests而不是aiohttp上传
+        
         token = self._get_random_token()
         headers = {
             'authorization': f'Bearer {token}',
@@ -314,57 +316,54 @@ class MinerUClient:
             **options
         }
         
-        async with session.post(
+        response = requests.post(
             f"{self.base_url}/file-urls/batch",
             headers=headers,
             json=data,
-            timeout=aiohttp.ClientTimeout(total=30)
-        ) as resp:
-            result = await resp.json()
-            
-            if result['code'] != 0:
-                print(f"❌ 获取上传链接失败: {result.get('msg')}")
-                return None
-            
-            batch_id = result['data']['batch_id']
-            upload_url = result['data']['file_urls'][0]
-            print(f"✅ 获取上传链接成功")
+            timeout=30
+        )
+        result = response.json()
         
-        # 2. 上传文件
+        if result['code'] != 0:
+            print(f"❌ 获取上传链接失败: {result.get('msg')}")
+            return None
+        
+        batch_id = result['data']['batch_id']
+        upload_url = result['data']['file_urls'][0]
+        print(f"✅ 获取上传链接成功")
+        
+        # 2. 上传文件（使用requests，与手动测试一致）
         print(f"📤 上传文件中...")
         with open(file_path, 'rb') as f:
-            file_data = f.read()
+            upload_response = requests.put(upload_url, data=f, timeout=300)
         
-        async with session.put(
-            upload_url,
-            data=file_data,
-            timeout=aiohttp.ClientTimeout(total=300)
-        ) as resp:
-            if resp.status == 200:
-                print(f"✅ 文件上传成功")
-                return batch_id
-            else:
-                print(f"❌ 文件上传失败: {resp.status}")
-                return None
+        if upload_response.status_code == 200:
+            print(f"✅ 文件上传成功")
+            return batch_id
+        else:
+            print(f"❌ 文件上传失败: {upload_response.status_code}")
+            return None
     
     async def get_batch_result(self, session: aiohttp.ClientSession,
                                batch_id: str) -> Optional[List[Dict]]:
         """获取批量任务结果"""
+        import requests  # 使用requests
+        
         token = self._get_random_token()
         headers = {
             'authorization': f'Bearer {token}'
         }
         
-        async with session.get(
+        response = requests.get(
             f"{self.base_url}/extract-results/batch/{batch_id}",
             headers=headers,
-            timeout=aiohttp.ClientTimeout(total=30)
-        ) as resp:
-            result = await resp.json()
-            
-            if result['code'] == 0:
-                return result['data']['extract_result']
-            return None
+            timeout=30
+        )
+        result = response.json()
+        
+        if result['code'] == 0:
+            return result['data']['extract_result']
+        return None
     
     async def wait_for_batch_completion(self, session: aiohttp.ClientSession,
                                        batch_id: str, max_wait: int = 600) -> Optional[List[Dict]]:
@@ -404,22 +403,32 @@ class ResultProcessor:
     """结果处理器 - 下载、解压、合并"""
     
     @staticmethod
-    async def download_and_extract(session: aiohttp.ClientSession,
-                                   zip_url: str, output_dir: str) -> Optional[str]:
+    async def download_and_extract(zip_url: str, output_dir: str) -> Optional[str]:
         """下载并解压结果"""
+        import requests  # 使用requests
+        
         try:
             # 下载
-            async with session.get(zip_url, timeout=aiohttp.ClientTimeout(total=300)) as resp:
-                zip_data = await resp.read()
+            print(f"📥 下载中...")
+            response = requests.get(zip_url, timeout=300)
+            
+            if response.status_code != 200:
+                print(f"❌ 下载失败: {response.status_code}")
+                return None
             
             # 保存
             zip_path = Path(output_dir) / "result.zip"
             with open(zip_path, 'wb') as f:
-                f.write(zip_data)
+                f.write(response.content)
+            
+            print(f"✅ 下载完成")
             
             # 解压
+            print(f"📦 解压中...")
             with zipfile.ZipFile(zip_path, 'r') as zip_ref:
                 zip_ref.extractall(output_dir)
+            
+            print(f"✅ 解压完成")
             
             # 删除zip
             zip_path.unlink()
@@ -615,7 +624,6 @@ class MinerUProcessor:
             chunk_dir.mkdir(exist_ok=True)
             
             extracted = await ResultProcessor.download_and_extract(
-                session,
                 full_zip_url,
                 str(chunk_dir)
             )
