@@ -5,27 +5,58 @@ MinerU MCP Server - 文档处理MCP服务器
 """
 import asyncio
 import json
+import sys
+import traceback
 from pathlib import Path
 from typing import Any, Sequence
-from mcp.server import Server
-from mcp.types import Tool, TextContent, ImageContent, EmbeddedResource
-import mcp.server.stdio
 
-# 导入我们的处理器
-import sys
-sys.path.append(str(Path(__file__).parent))
-from mineru_production import MinerUProcessor, FileValidator
+# 添加详细日志
+import logging
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    handlers=[
+        logging.FileHandler('/tmp/mineru_mcp_debug.log'),
+        logging.StreamHandler(sys.stderr)
+    ]
+)
+logger = logging.getLogger(__name__)
+
+logger.info("="*60)
+logger.info("MinerU MCP Server 启动")
+logger.info("="*60)
+
+try:
+    logger.info("步骤1: 导入MCP模块...")
+    from mcp.server import Server
+    from mcp.types import Tool, TextContent, ImageContent, EmbeddedResource
+    import mcp.server.stdio
+    logger.info("✅ MCP模块导入成功")
+except Exception as e:
+    logger.error(f"❌ MCP模块导入失败: {e}")
+    logger.error(traceback.format_exc())
+    sys.exit(1)
+
+# 添加项目路径
+logger.info("步骤2: 添加项目路径...")
+script_dir = Path(__file__).parent
+sys.path.insert(0, str(script_dir))
+logger.info(f"✅ 项目路径: {script_dir}")
+
+# 延迟导入mineru_production
+logger.info("步骤3: 准备延迟导入mineru_production...")
+processor = None
 
 # 创建MCP服务器
+logger.info("步骤4: 创建MCP服务器...")
 app = Server("mineru-processor")
-
-# 全局处理器实例
-processor = None
+logger.info("✅ MCP服务器创建成功")
 
 
 @app.list_tools()
 async def list_tools() -> list[Tool]:
     """列出所有可用工具"""
+    logger.info("list_tools() 被调用")
     return [
         Tool(
             name="process_document",
@@ -208,29 +239,42 @@ async def call_tool(name: str, arguments: dict) -> Sequence[TextContent | ImageC
     """处理工具调用"""
     global processor
     
+    logger.info(f"call_tool() 被调用: {name}")
+    logger.info(f"参数: {arguments}")
+    
     try:
-        # 初始化处理器（使用绝对路径）
+        # 延迟导入处理器
         if processor is None:
-            script_dir = Path(__file__).parent
-            tokens_file = script_dir / 'all_tokens.json'
-            
-            if not tokens_file.exists():
+            logger.info("首次调用，导入MinerUProcessor...")
+            try:
+                from mineru_production import MinerUProcessor
+                logger.info("✅ MinerUProcessor导入成功")
+                
+                processor = MinerUProcessor(max_workers=10)
+                logger.info("✅ MinerUProcessor初始化成功")
+            except Exception as e:
+                logger.error(f"❌ MinerUProcessor导入/初始化失败: {e}")
+                logger.error(traceback.format_exc())
                 return [TextContent(
                     type="text",
                     text=json.dumps({
-                        "error": f"Token文件不存在: {tokens_file}",
-                        "hint": "请先运行: cd /Users/jiasunm/Code/GenAI/MinerU-Token && python3 batch_login.py"
+                        "error": f"处理器初始化失败: {str(e)}",
+                        "traceback": traceback.format_exc()
                     }, ensure_ascii=False)
                 )]
-            
-            processor = MinerUProcessor(max_workers=10)
         
         if name == "process_document":
+            logger.info("处理 process_document 工具调用")
             # 处理单个文档
             file_path = arguments["file_path"]
-            options = {k: v for k, v in arguments.items() if k != "file_path"}
+            logger.info(f"文件路径: {file_path}")
             
+            options = {k: v for k, v in arguments.items() if k != "file_path"}
+            logger.info(f"选项: {options}")
+            
+            logger.info("开始处理文件...")
             result = await processor.process_file(file_path, **options)
+            logger.info(f"处理结果: {result}")
             
             if result:
                 return [TextContent(
@@ -270,12 +314,16 @@ async def call_tool(name: str, arguments: dict) -> Sequence[TextContent | ImageC
             )]
         
         elif name == "get_token_status":
+            logger.info("处理 get_token_status 工具调用")
             # 查询Token状态
             script_dir = Path(__file__).parent
             tokens_file = script_dir / 'all_tokens.json'
+            logger.info(f"Token文件路径: {tokens_file}")
             
             with open(tokens_file, 'r') as f:
                 tokens = json.load(f)
+            
+            logger.info(f"读取到 {len(tokens)} 个账户")
             
             status = []
             for email, info in tokens.items():
@@ -291,24 +339,43 @@ async def call_tool(name: str, arguments: dict) -> Sequence[TextContent | ImageC
                 text=json.dumps(status, indent=2, ensure_ascii=False)
             )]
         
+        logger.warning(f"未知工具: {name}")
         return [TextContent(type="text", text=json.dumps({"error": "未知工具"}))]
     
     except Exception as e:
+        logger.error(f"工具调用异常: {e}")
+        logger.error(traceback.format_exc())
         return [TextContent(
             type="text",
-            text=json.dumps({"error": str(e)}, ensure_ascii=False)
+            text=json.dumps({"error": str(e), "traceback": traceback.format_exc()}, ensure_ascii=False)
         )]
 
 
 async def main():
     """运行MCP服务器"""
-    async with mcp.server.stdio.stdio_server() as (read_stream, write_stream):
-        await app.run(
-            read_stream,
-            write_stream,
-            app.create_initialization_options()
-        )
+    logger.info("步骤5: 启动MCP服务器...")
+    try:
+        async with mcp.server.stdio.stdio_server() as (read_stream, write_stream):
+            logger.info("✅ stdio通道已建立")
+            await app.run(
+                read_stream,
+                write_stream,
+                app.create_initialization_options()
+            )
+            logger.info("MCP服务器正常退出")
+    except Exception as e:
+        logger.error(f"❌ MCP服务器运行失败: {e}")
+        logger.error(traceback.format_exc())
+        raise
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    logger.info("步骤6: 运行主函数...")
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        logger.info("收到中断信号，退出")
+    except Exception as e:
+        logger.error(f"主函数异常: {e}")
+        logger.error(traceback.format_exc())
+        sys.exit(1)
