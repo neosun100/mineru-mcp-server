@@ -154,33 +154,140 @@ class FileChunker:
 
 
 class ResultMerger:
-    """结果合并器"""
+    """结果合并器 - 处理MinerU API返回的完整结果"""
     
     @staticmethod
-    def merge_markdown(results: List[Dict], output_file: str):
-        """合并Markdown结果"""
-        with open(output_file, 'w', encoding='utf-8') as f:
-            for i, result in enumerate(results, 1):
-                if i > 1:
-                    f.write("\n\n---\n\n")
-                f.write(f"# 分片 {i}\n\n")
-                f.write(result.get('content', ''))
+    async def download_file(session: aiohttp.ClientSession, url: str, output_path: str):
+        """下载文件"""
+        async with session.get(url) as resp:
+            with open(output_path, 'wb') as f:
+                f.write(await resp.read())
+    
+    @staticmethod
+    async def download_and_extract_results(results: List[Dict], output_dir: str) -> List[Dict]:
+        """
+        下载并解压所有结果
         
-        print(f"✅ 合并完成: {output_file}")
+        MinerU API返回结构:
+        {
+            'full_zip_url': 'https://...zip',  # 完整压缩包
+            'md_url': 'https://...md',          # Markdown文件
+            'md_content_url': 'https://...',    # Markdown内容
+            'layout_tree_url': 'https://...'    # 布局树
+        }
+        """
+        import zipfile
+        from pathlib import Path
+        
+        output_path = Path(output_dir)
+        output_path.mkdir(exist_ok=True, parents=True)
+        
+        extracted_results = []
+        
+        async with aiohttp.ClientSession() as session:
+            for i, result in enumerate(results, 1):
+                if result['status'] != 'success':
+                    continue
+                
+                data = result['result']
+                chunk_dir = output_path / f"chunk_{i}"
+                chunk_dir.mkdir(exist_ok=True)
+                
+                print(f"📥 下载分片 {i}...")
+                
+                # 下载完整压缩包
+                if 'full_zip_url' in data:
+                    zip_path = chunk_dir / "result.zip"
+                    await ResultMerger.download_file(session, data['full_zip_url'], str(zip_path))
+                    
+                    # 解压
+                    with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                        zip_ref.extractall(chunk_dir)
+                    
+                    print(f"  ✅ 解压完成: {chunk_dir}")
+                
+                # 下载Markdown
+                md_content = None
+                if 'md_content_url' in data:
+                    async with session.get(data['md_content_url']) as resp:
+                        md_content = await resp.text()
+                elif 'md_url' in data:
+                    async with session.get(data['md_url']) as resp:
+                        md_content = await resp.text()
+                
+                extracted_results.append({
+                    'chunk_id': i,
+                    'chunk_dir': str(chunk_dir),
+                    'md_content': md_content,
+                    'data': data
+                })
+        
+        return extracted_results
     
     @staticmethod
-    def merge_json(results: List[Dict], output_file: str):
-        """合并JSON结果"""
+    def merge_markdown_files(extracted_results: List[Dict], output_file: str):
+        """合并Markdown内容"""
+        with open(output_file, 'w', encoding='utf-8') as f:
+            for i, result in enumerate(extracted_results, 1):
+                if i > 1:
+                    f.write("\n\n" + "="*60 + "\n\n")
+                
+                f.write(f"# 分片 {i}\n\n")
+                
+                if result['md_content']:
+                    f.write(result['md_content'])
+                else:
+                    f.write("*内容为空*\n")
+        
+        print(f"✅ Markdown合并完成: {output_file}")
+    
+    @staticmethod
+    def merge_images(extracted_results: List[Dict], output_dir: str):
+        """合并所有图片到统一目录"""
+        import shutil
+        
+        images_dir = Path(output_dir) / "images"
+        images_dir.mkdir(exist_ok=True, parents=True)
+        
+        image_count = 0
+        
+        for result in extracted_results:
+            chunk_dir = Path(result['chunk_dir'])
+            
+            # 查找所有图片文件
+            for img_file in chunk_dir.rglob("*.png"):
+                new_name = f"chunk_{result['chunk_id']}_{img_file.name}"
+                shutil.copy(img_file, images_dir / new_name)
+                image_count += 1
+            
+            for img_file in chunk_dir.rglob("*.jpg"):
+                new_name = f"chunk_{result['chunk_id']}_{img_file.name}"
+                shutil.copy(img_file, images_dir / new_name)
+                image_count += 1
+        
+        print(f"✅ 图片合并完成: {image_count} 个文件 → {images_dir}")
+    
+    @staticmethod
+    def merge_json_metadata(extracted_results: List[Dict], output_file: str):
+        """合并JSON元数据"""
         merged = {
-            'total_chunks': len(results),
+            'total_chunks': len(extracted_results),
             'merged_at': datetime.now().isoformat(),
-            'chunks': results
+            'chunks': [
+                {
+                    'chunk_id': r['chunk_id'],
+                    'chunk_dir': r['chunk_dir'],
+                    'has_content': r['md_content'] is not None,
+                    'urls': r['data']
+                }
+                for r in extracted_results
+            ]
         }
         
         with open(output_file, 'w', encoding='utf-8') as f:
             json.dump(merged, f, indent=2, ensure_ascii=False)
         
-        print(f"✅ 合并完成: {output_file}")
+        print(f"✅ JSON元数据合并完成: {output_file}")
 
 
 class ProgressMonitor:
@@ -349,7 +456,7 @@ class MinerUBatchProcessor:
     
     def process_large_file(self, file_path: str, output_dir: str = "./output") -> Dict:
         """
-        处理大文件（自动拆分、并行处理、合并）
+        处理大文件（自动拆分、并行处理、完整合并）
         
         Args:
             file_path: 文件路径
@@ -369,6 +476,9 @@ class MinerUBatchProcessor:
         
         # 2. 上传分片（这里需要实际上传逻辑）
         # TODO: 实现文件上传到CDN
+        print("\n⚠️  注意: 需要先上传分片到CDN，获取URL")
+        print("💡 提示: 使用 upload_chunks() 方法上传")
+        
         files = [
             {'id': f'chunk_{i}', 'url': f'https://example.com/{Path(c).name}'}
             for i, c in enumerate(chunks)
@@ -377,29 +487,38 @@ class MinerUBatchProcessor:
         # 3. 并行处理
         results = self.process_files(files)
         
-        # 4. 合并结果
-        output_path = Path(output_dir)
-        output_path.mkdir(exist_ok=True)
+        # 4. 下载并解压所有结果
+        print(f"\n📥 下载并解压结果...")
+        extracted_results = asyncio.run(
+            ResultMerger.download_and_extract_results(results, output_dir)
+        )
         
+        # 5. 合并所有内容
+        output_path = Path(output_dir)
         file_name = Path(file_path).stem
         
-        # 提取成功的结果
-        success_results = [r for r in results if r['status'] == 'success']
+        print(f"\n🔗 合并结果...")
         
-        if success_results:
-            # 合并Markdown
-            md_file = output_path / f"{file_name}_merged.md"
-            ResultMerger.merge_markdown(success_results, str(md_file))
-            
-            # 合并JSON
-            json_file = output_path / f"{file_name}_merged.json"
-            ResultMerger.merge_json(success_results, str(json_file))
+        # 合并Markdown
+        md_file = output_path / f"{file_name}_merged.md"
+        ResultMerger.merge_markdown_files(extracted_results, str(md_file))
+        
+        # 合并图片
+        ResultMerger.merge_images(extracted_results, output_dir)
+        
+        # 合并元数据
+        json_file = output_path / f"{file_name}_metadata.json"
+        ResultMerger.merge_json_metadata(extracted_results, str(json_file))
         
         return {
             'total_chunks': len(chunks),
-            'success': len(success_results),
-            'failed': len(results) - len(success_results),
-            'output_files': [str(md_file), str(json_file)] if success_results else []
+            'success': len(extracted_results),
+            'failed': len(results) - len(extracted_results),
+            'output_files': {
+                'markdown': str(md_file),
+                'images': str(output_path / "images"),
+                'metadata': str(json_file)
+            }
         }
 
 
