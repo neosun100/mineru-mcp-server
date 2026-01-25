@@ -8,7 +8,7 @@ from PyPDF2 import PdfReader, PdfWriter
 
 def split_large_pdf(file_path: str, max_size_mb: int = 180) -> list:
     """
-    按文件大小拆分PDF
+    按文件大小拆分PDF（同时考虑页数限制）
     
     Args:
         file_path: PDF文件路径
@@ -30,12 +30,18 @@ def split_large_pdf(file_path: str, max_size_mb: int = 180) -> list:
         print("✅ 文件大小在限制内，无需拆分")
         return [file_path]
     
-    # 计算需要拆分的数量
-    chunk_count = int(file_size / max_size_mb) + 1
+    # 同时考虑大小和页数限制
+    chunks_by_size = int(file_size / max_size_mb) + 1
+    chunks_by_pages = (total_pages + 599) // 600  # 确保每个分片 ≤ 600页
+    
+    # 取较大值，确保同时满足两个限制
+    chunk_count = max(chunks_by_size, chunks_by_pages)
     pages_per_chunk = total_pages // chunk_count
     
     print(f"\n📦 拆分策略:")
-    print(f"  拆分为: {chunk_count} 个文件")
+    print(f"  按大小需要: {chunks_by_size} 个分片")
+    print(f"  按页数需要: {chunks_by_pages} 个分片")
+    print(f"  实际拆分为: {chunk_count} 个分片")
     print(f"  每个约: {pages_per_chunk} 页")
     
     chunks = []
@@ -55,7 +61,14 @@ def split_large_pdf(file_path: str, max_size_mb: int = 180) -> list:
             writer.write(f)
         
         chunk_size = chunk_path.stat().st_size / 1024 / 1024
-        print(f"  ✅ 分片{i+1}: {start_page+1}-{end_page}页 ({chunk_size:.1f}MB)")
+        chunk_pages = end_page - start_page
+        
+        # 验证分片
+        status = "✅" if chunk_size < 200 and chunk_pages <= 600 else "⚠️"
+        print(f"  {status} 分片{i+1}: {start_page+1}-{end_page}页 ({chunk_size:.1f}MB, {chunk_pages}页)")
+        
+        if chunk_pages > 600:
+            print(f"     ⚠️  警告: 分片{i+1}超过600页，需要使用page_ranges")
         
         chunks.append(str(chunk_path))
     

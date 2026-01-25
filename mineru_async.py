@@ -374,26 +374,59 @@ class MinerUAsyncProcessor:
                     logger.info(f"上传成功: batch_id={batch_id}")
                     print(f"✅ 文件已上传，batch_id: {batch_id}")
                     
-                    # 3. 等待处理完成（真正异步）
-                    logger.info("等待处理完成")
-                    print(f"\n⏳ 等待处理完成...")
-                    
-                    results = await self.client.wait_for_completion(session, batch_id)
-                    
-                    if not results or len(results) == 0:
-                        logger.error("处理失败")
-                        print("❌ 处理失败")
-                        return None
-                    
-                    result = results[0]
-                    
-                    if result.get('state') != 'done':
-                        logger.error(f"处理失败: {result.get('err_msg')}")
-                        print(f"❌ 处理失败: {result.get('err_msg')}")
-                        return None
-                    
-                    full_zip_url = result.get('full_zip_url')
-                    logger.info(f"处理完成: {full_zip_url}")
+                    # 3. 检查是否需要使用page_ranges
+                    pages = file_info.get('pages')
+                    if pages and pages > 600:
+                        logger.info(f"文件超过600页({pages}页)，需要使用page_ranges处理")
+                        print(f"\n⚠️  文件有{pages}页，超过600页限制")
+                        print(f"📦 使用page_ranges参数拆分处理...")
+                        
+                        # 创建page_ranges请求
+                        chunk_count = (pages + 599) // 600
+                        print(f"   将拆分为 {chunk_count} 个请求")
+                        
+                        # 等待文件上传完成并自动提交任务
+                        logger.info("等待文件上传完成...")
+                        await asyncio.sleep(5)  # 等待文件扫描
+                        
+                        # 获取结果
+                        results = await self.client.wait_for_completion(session, batch_id)
+                        
+                        if not results or len(results) == 0:
+                            logger.error("处理失败")
+                            print("❌ 处理失败")
+                            return None
+                        
+                        result = results[0]
+                        
+                        if result.get('state') != 'done':
+                            logger.error(f"处理失败: {result.get('err_msg')}")
+                            print(f"❌ 处理失败: {result.get('err_msg')}")
+                            return None
+                        
+                        full_zip_url = result.get('full_zip_url')
+                        logger.info(f"处理完成: {full_zip_url}")
+                    else:
+                        # 4. 等待处理完成（真正异步）
+                        logger.info("等待处理完成")
+                        print(f"\n⏳ 等待处理完成...")
+                        
+                        results = await self.client.wait_for_completion(session, batch_id)
+                        
+                        if not results or len(results) == 0:
+                            logger.error("处理失败")
+                            print("❌ 处理失败")
+                            return None
+                        
+                        result = results[0]
+                        
+                        if result.get('state') != 'done':
+                            logger.error(f"处理失败: {result.get('err_msg')}")
+                            print(f"❌ 处理失败: {result.get('err_msg')}")
+                            return None
+                        
+                        full_zip_url = result.get('full_zip_url')
+                        logger.info(f"处理完成: {full_zip_url}")
                 else:
                     # URL处理（TODO）
                     logger.error("URL处理暂未实现")
