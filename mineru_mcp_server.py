@@ -224,55 +224,57 @@ async def call_tool(name: str, arguments: dict) -> Sequence[TextContent | ImageC
                 )]
             
             processor = MinerUProcessor(max_workers=10)
-    
-    if name == "process_document":
-        # 处理单个文档
-        file_path = arguments["file_path"]
-        options = {k: v for k, v in arguments.items() if k != "file_path"}
         
-        result = await processor.process_file(file_path, **options)
+        if name == "process_document":
+            # 处理单个文档
+            file_path = arguments["file_path"]
+            options = {k: v for k, v in arguments.items() if k != "file_path"}
+            
+            result = await processor.process_file(file_path, **options)
+            
+            if result:
+                return [TextContent(
+                    type="text",
+                    text=json.dumps(result, indent=2, ensure_ascii=False)
+                )]
+            else:
+                return [TextContent(
+                    type="text",
+                    text=json.dumps({"status": "failed", "error": "处理失败"})
+                )]
         
-        if result:
+        elif name == "process_directory":
+            # 批量处理目录
+            directory = arguments["directory"]
+            # TODO: 实现目录处理
             return [TextContent(
                 type="text",
-                text=json.dumps(result, indent=2, ensure_ascii=False)
+                text=json.dumps({"status": "todo", "message": "功能开发中"})
             )]
-        else:
+        
+        elif name == "process_urls":
+            # 批量处理URL
+            urls = arguments["urls"]
+            # TODO: 实现批量URL处理
             return [TextContent(
                 type="text",
-                text=json.dumps({"status": "failed", "error": "处理失败"})
+                text=json.dumps({"status": "todo", "message": "功能开发中"})
             )]
-    
-    elif name == "process_directory":
-        # 批量处理目录
-        directory = arguments["directory"]
-        # TODO: 实现目录处理
-        return [TextContent(
-            type="text",
-            text=json.dumps({"status": "todo", "message": "功能开发中"})
-        )]
-    
-    elif name == "process_urls":
-        # 批量处理URL
-        urls = arguments["urls"]
-        # TODO: 实现批量URL处理
-        return [TextContent(
-            type="text",
-            text=json.dumps({"status": "todo", "message": "功能开发中"})
-        )]
-    
-    elif name == "extract_info":
-        # 提取结构化信息
-        # TODO: 实现KIE提取
-        return [TextContent(
-            type="text",
-            text=json.dumps({"status": "todo", "message": "功能开发中"})
-        )]
-    
-    elif name == "get_token_status":
-        # 查询Token状态
-        try:
-            with open('all_tokens.json', 'r') as f:
+        
+        elif name == "extract_info":
+            # 提取结构化信息
+            # TODO: 实现KIE提取
+            return [TextContent(
+                type="text",
+                text=json.dumps({"status": "todo", "message": "功能开发中"})
+            )]
+        
+        elif name == "get_token_status":
+            # 查询Token状态
+            script_dir = Path(__file__).parent
+            tokens_file = script_dir / 'all_tokens.json'
+            
+            with open(tokens_file, 'r') as f:
                 tokens = json.load(f)
             
             status = []
@@ -288,13 +290,14 @@ async def call_tool(name: str, arguments: dict) -> Sequence[TextContent | ImageC
                 type="text",
                 text=json.dumps(status, indent=2, ensure_ascii=False)
             )]
-        except Exception as e:
-            return [TextContent(
-                type="text",
-                text=json.dumps({"error": str(e)})
-            )]
+        
+        return [TextContent(type="text", text=json.dumps({"error": "未知工具"}))]
     
-    return [TextContent(type="text", text=json.dumps({"error": "未知工具"}))]
+    except Exception as e:
+        return [TextContent(
+            type="text",
+            text=json.dumps({"error": str(e)}, ensure_ascii=False)
+        )]
 
 
 async def main():
