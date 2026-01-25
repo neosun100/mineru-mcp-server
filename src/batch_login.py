@@ -5,14 +5,21 @@
 """
 import json, time, requests, random, yaml
 from datetime import datetime
+from pathlib import Path
 from playwright.sync_api import sync_playwright
 
 def load_accounts():
-    with open('accounts.yaml', 'r', encoding='utf-8') as f:
+    # 配置文件在项目根目录
+    project_root = Path(__file__).parent.parent
+    config_file = project_root / 'accounts.yaml'
+    with open(config_file, 'r', encoding='utf-8') as f:
         return yaml.safe_load(f)['accounts']
 
 def save_all_tokens(tokens):
-    with open('all_tokens.json', 'w') as f:
+    # Token文件在项目根目录
+    project_root = Path(__file__).parent.parent
+    token_file = project_root / 'all_tokens.json'
+    with open(token_file, 'w') as f:
         json.dump(tokens, f, indent=2, ensure_ascii=False)
 
 def type_human(page, selector, text):

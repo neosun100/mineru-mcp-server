@@ -151,7 +151,8 @@ class MinerUAsyncClient:
     
     def __init__(self, tokens_file='all_tokens.json'):
         if not Path(tokens_file).is_absolute():
-            script_dir = Path(__file__).parent
+            # Token文件在项目根目录，不是src目录
+            script_dir = Path(__file__).parent.parent  # 向上一级到项目根目录
             tokens_file = script_dir / tokens_file
         
         self.tokens_file = str(tokens_file)
