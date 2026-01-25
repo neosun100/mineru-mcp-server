@@ -1,0 +1,16 @@
+# 账号配置示例
+# 复制此文件为 accounts.yaml 并填入真实信息
+
+accounts:
+  - name: "主账号"
+    email: "your_email@example.com"
+    password: "your_password"
+    
+  - name: "备用账号"
+    email: "another_email@example.com"
+    password: "another_password"
+
+# 说明：
+# - name: 账号备注名称
+# - email: 登录邮箱
+# - password: 登录密码
