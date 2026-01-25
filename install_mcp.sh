@@ -48,17 +48,17 @@ echo ""
 echo "步骤3: 配置账户"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-if [ ! -f "$PROJECT_DIR/accounts.yaml" ]; then
-    if [ -f "$PROJECT_DIR/accounts.yaml.example" ]; then
-        cp "$PROJECT_DIR/accounts.yaml.example" "$PROJECT_DIR/accounts.yaml"
-        echo "✅ 已创建 accounts.yaml"
-        echo "⚠️  请编辑 accounts.yaml 填入账户信息"
-        echo "   vi $PROJECT_DIR/accounts.yaml"
+if [ ! -f "$PROJECT_DIR/config/accounts.yaml" ]; then
+    if [ -f "$PROJECT_DIR/config/accounts.yaml.example" ]; then
+        cp "$PROJECT_DIR/config/accounts.yaml.example" "$PROJECT_DIR/config/accounts.yaml"
+        echo "✅ 已创建 config/accounts.yaml"
+        echo "⚠️  请编辑 config/accounts.yaml 填入账户信息"
+        echo "   vi $PROJECT_DIR/config/accounts.yaml"
     else
-        echo "⚠️  未找到 accounts.yaml.example"
+        echo "⚠️  未找到 config/accounts.yaml.example"
     fi
 else
-    echo "✅ accounts.yaml 已存在"
+    echo "✅ config/accounts.yaml 已存在"
 fi
 echo ""
 
@@ -93,9 +93,9 @@ if 'mcpServers' not in config:
 
 config['mcpServers']['mineru'] = {
     'command': '$PROJECT_DIR/.venv/bin/python3',
-    'args': ['$PROJECT_DIR/mineru_mcp_server.py'],
+    'args': ['$PROJECT_DIR/src/mineru_mcp_server.py'],
     'env': {
-        'PYTHONPATH': '$PROJECT_DIR'
+        'PYTHONPATH': '$PROJECT_DIR/src'
     }
 }
 
@@ -116,13 +116,13 @@ echo "步骤5: 验证安装"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
 echo "检查Python模块..."
-python3 -c "from mineru_async import MinerUAsyncProcessor; print('✅ mineru_async')"
-python3 -c "from mineru_batch_async import BatchAsyncProcessor; print('✅ mineru_batch_async')"
-python3 -c "import mineru_mcp_server; print('✅ mineru_mcp_server')"
+python3 -c "from src.mineru_async import MinerUAsyncProcessor; print('✅ mineru_async')"
+python3 -c "from src.mineru_batch_async import BatchAsyncProcessor; print('✅ mineru_batch_async')"
+python3 -c "import src.mineru_mcp_server; print('✅ mineru_mcp_server')"
 
 echo ""
 echo "检查MCP服务器..."
-python3 -m py_compile "$PROJECT_DIR/mineru_mcp_server.py" && echo "✅ MCP服务器语法正确"
+python3 -m py_compile "$PROJECT_DIR/src/mineru_mcp_server.py" && echo "✅ MCP服务器语法正确"
 
 echo ""
 
@@ -141,7 +141,7 @@ echo "   vi $PROJECT_DIR/accounts.yaml"
 echo ""
 echo "2. 批量登录获取Token"
 echo "   cd $PROJECT_DIR"
-echo "   python3 batch_login.py"
+echo "   python3 src/batch_login.py"
 echo ""
 echo "3. 重启Kiro CLI"
 echo "   /quit"

@@ -86,8 +86,8 @@ cd mineru-mcp-server
 ### 配置账户
 
 ```bash
-vi accounts.yaml  # 填入账户信息
-python3 batch_login.py  # 批量登录获取Token
+vi config/accounts.yaml  # 填入账户信息
+python3 src/batch_login.py  # 批量登录获取Token
 ```
 
 ### 使用
@@ -104,13 +104,13 @@ python3 batch_login.py  # 批量登录获取Token
 
 ```bash
 # Rich UI（美观界面）
-python3 mineru_rich_enhanced.py ~/Documents/report.pdf
+python3 tools/mineru_rich_enhanced.py ~/Documents/report.pdf
 
 # 批量异步并行
-python3 mineru_batch_async.py ~/Documents "*.pdf"
+python3 src/mineru_batch_async.py ~/Documents "*.pdf"
 
 # 直接处理
-python3 mineru_async.py ~/Documents/report.pdf
+python3 src/mineru_async.py ~/Documents/report.pdf
 ```
 
 ## 📦 安装
@@ -232,21 +232,40 @@ python3 test_large_file_complete.py ~/Documents/large_file.pdf
 
 ```
 mineru-mcp-server/
-├── batch_login.py              # Token管理
-├── manage_tokens.py            # Token查看
-├── mineru_async.py             # 异步处理器
-├── mineru_batch_async.py       # 批量并行处理
-├── mineru_rich_enhanced.py     # Rich UI
-├── mineru_mcp_server.py        # MCP服务器
-├── split_large_file.py         # 拆分工具
-├── install_mcp.sh              # 一键安装
-├── accounts.yaml.example       # 配置模板
+├── README.md                   # 主文档
 ├── .gitignore                  # Git忽略规则
-├── README.md                   # 本文档
-├── QUICK_START.md              # 快速开始
-├── MCP_INSTALLATION.md         # MCP安装指南
-├── SECURITY_REPORT.md          # 安全报告
-└── requirements.txt            # 依赖列表
+├── requirements.txt            # 依赖列表
+├── install_mcp.sh              # 一键安装脚本
+│
+├── src/                        # 核心代码
+│   ├── batch_login.py          # Token管理
+│   ├── manage_tokens.py        # Token查看
+│   ├── mineru_async.py         # 异步处理器
+│   ├── mineru_batch_async.py   # 批量并行处理
+│   ├── mineru_mcp_server.py    # MCP服务器
+│   ├── split_large_file.py     # 拆分工具
+│   ├── login_complete.py       # 单账户登录
+│   └── renew_token.py          # Token续期
+│
+├── tools/                      # 辅助工具
+│   ├── mineru_rich_enhanced.py # Rich UI增强版
+│   ├── test_large_file_complete.py # 超大文件测试
+│   └── ...
+│
+├── docs/                       # 文档目录
+│   ├── QUICK_START.md          # 快速开始
+│   ├── MCP_INSTALLATION.md     # MCP安装指南
+│   ├── MCP_DESIGN.md           # MCP设计文档
+│   ├── SECURITY_REPORT.md      # 安全报告
+│   ├── PROCESSING_FLOW.md      # 处理流程
+│   └── ...
+│
+├── config/                     # 配置文件
+│   └── accounts.yaml.example   # 配置模板
+│
+└── tests/                      # 测试文件
+    ├── test_all.py
+    └── test_workflow.sh
 ```
 
 ## 📚 文档
