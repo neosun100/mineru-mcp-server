@@ -8,11 +8,11 @@
 
 ### accounts.yaml
 包含5个账户的配置：
-- 主账号: neosun808@gmail.com
-- 账号2: 165312351@qq.com
-- 账号3: yiqidangqian@foxmail.com
-- 账号4: xinancaijingdaxue@qq.com
-- 账号5: xinwuchen@vip.qq.com
+- 主账号: user1@example.com
+- 账号2: user2@example.com
+- 账号3: user3@example.com
+- 账号4: user4@example.com
+- 账号5: user5@example.com
 
 ### all_tokens.json
 统一管理所有账户的 Token：
@@ -91,7 +91,7 @@ with open('all_tokens.json') as f:
     tokens = json.load(f)
 
 # 使用主账号的Token
-main_token = tokens['neosun808@gmail.com']['token']
+main_token = tokens['user1@example.com']['token']
 
 # 调用API
 import requests

@@ -147,7 +147,7 @@ MinerU API Token 自动续期
 ============================================================
 ✅ 成功创建新 Token
 📝 名称: token-20260125000734
-🔑 Token: eyJ0eXBlIjoiSldUIiwiYWxnIjoiSFM1MTIifQ...
+🔑 Token: eyJxxxxxx...（已隐藏）
 
 ✅ Token 续期成功！
 ```
@@ -340,7 +340,7 @@ curl 'https://mineru.net/api/v4/tokens' \
     "id": "uuid",
     "token_name": "token-20260125000000",
     "expired_at": "2026-02-08T00:00:00+08:00",
-    "token": "eyJ0eXBlIjoiSldUIiwiYWxnIjoiSFM1MTIifQ..."
+    "token": "eyJxxxxxx...（已隐藏）"
   }
 }
 ```

@@ -23,8 +23,8 @@ vi accounts.yaml
 ```yaml
 accounts:
   - name: "主账号"
-    email: "neosun808@gmail.com"
-    password: "neosun100"
+    email: "your_email@example.com"
+    password: "your_password"
     
   - name: "备用账号"
     email: "another@example.com"
@@ -55,7 +55,7 @@ python3 login_complete.py
 python3 login_complete.py
 
 请选择账号:
-  1. 主账号 (neosun808@gmail.com)
+  1. 主账号 (user1@example.com)
   2. 备用账号 (another@example.com)
 
 输入序号: 1

@@ -139,7 +139,7 @@ MinerU API（文档处理）
 ```json
 [
   {
-    "email": "neosun808@gmail.com",
+    "email": "user1@example.com",
     "name": "主账号",
     "token_name": "token-20260125013352",
     "expired_at": "2026-02-07T17:33:52Z"
