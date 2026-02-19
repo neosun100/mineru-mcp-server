@@ -86,9 +86,23 @@ cd mineru-mcp-server
 ### 配置账户
 
 ```bash
+cp config/accounts.yaml.example config/accounts.yaml
 vi config/accounts.yaml  # 填入账户信息
-python3 src/batch_login.py  # 批量登录获取Token
 ```
+
+### 批量登录获取Token
+
+> ⚠️ **需要图形界面环境（macOS/Windows/Linux桌面）**，不支持无UI的服务器环境。
+
+```bash
+.venv/bin/python3 src/batch_login.py
+```
+
+脚本会自动完成以下流程：
+1. 打开浏览器访问 MinerU 登录页
+2. 自动填写账号密码
+3. 自动点击阿里云验证码（大部分账户全自动通过）
+4. 自动获取并保存 Token 到 `all_tokens.json`
 
 ### 使用
 
@@ -133,13 +147,14 @@ uv venv
 source .venv/bin/activate
 
 # 3. 安装依赖
-uv pip install niquests PyPDF2 python-pptx python-docx mcp rich selenium pyyaml
+uv pip install niquests PyPDF2 python-pptx python-docx mcp rich playwright pyyaml
+playwright install chromium
 
 # 4. 配置账户
 cp accounts.yaml.example accounts.yaml
 vi accounts.yaml
 
-# 5. 批量登录
+# 5. 批量登录（需要图形界面环境）
 python3 batch_login.py
 ```
 
@@ -433,15 +448,23 @@ AI: 好的，我来处理这个PDF文件。
 
 ### 批量登录
 
+> ⚠️ **需要图形界面环境**（macOS/Windows/Linux桌面），脚本会打开浏览器窗口。
+
 ```bash
-python3 batch_login.py
+.venv/bin/python3 src/batch_login.py
 ```
 
-- 自动登录多个账户
-- 每个账户只需手动点击验证（5秒）
-- 自动删除旧Token
-- 自动创建新Token
-- 保存到 `all_tokens.json`
+**全自动流程：**
+1. 访问 MinerU 首页，点击登录按钮
+2. 跳转 SSO 登录页，自动填写账号密码
+3. 自动点击阿里云验证码（`#aliyunCaptcha-checkbox-icon`）
+4. 验证通过后自动删除旧 Token、创建新 Token
+5. 保存到 `all_tokens.json`
+
+**说明：**
+- 大部分账户验证码全自动通过，个别可能需手动点击
+- 短时间内连续登录过多账户可能触发风控，重试即可
+- Token 有效期约 90 天
 
 ### 查看Token状态
 
