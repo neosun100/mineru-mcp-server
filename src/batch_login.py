@@ -1,14 +1,46 @@
 #!/usr/bin/env python3
 """
-批量登录 - 全自动版本
+批量登录 - 全自动版本（支持 headless）
 自动点击登录、自动点击阿里云验证码、自动检测登录成功
+默认 headless 模式，可用 --headed 参数打开浏览器界面
 """
-import json, time, requests, random, yaml
+import json, time, requests, random, yaml, sys
 from datetime import datetime
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 
 PROJECT_ROOT = Path(__file__).parent.parent
+HEADED = '--headed' in sys.argv
+
+STEALTH_JS = """
+Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
+delete navigator.__proto__.webdriver;
+Object.defineProperty(navigator, 'plugins', {
+    get: () => {
+        const p = [
+            {name: 'Chrome PDF Plugin', filename: 'internal-pdf-viewer'},
+            {name: 'Chrome PDF Viewer', filename: 'mhjfbmdgcfjbbpaeojofohoefgiehjai'},
+            {name: 'Native Client', filename: 'internal-nacl-plugin'},
+        ];
+        p.length = 3; return p;
+    }
+});
+Object.defineProperty(navigator, 'languages', {get: () => ['zh-CN', 'zh', 'en-US', 'en']});
+window.chrome = {runtime: {}, loadTimes: function(){}, csi: function(){}};
+const origQuery = window.navigator.permissions.query;
+window.navigator.permissions.query = (p) => (
+    p.name === 'notifications' ? Promise.resolve({state: Notification.permission}) : origQuery(p)
+);
+Object.defineProperty(navigator, 'platform', {get: () => 'MacIntel'});
+Object.defineProperty(navigator, 'hardwareConcurrency', {get: () => 8});
+Object.defineProperty(navigator, 'deviceMemory', {get: () => 8});
+const getParam = WebGLRenderingContext.prototype.getParameter;
+WebGLRenderingContext.prototype.getParameter = function(p) {
+    if (p === 37445) return 'Intel Inc.';
+    if (p === 37446) return 'Intel Iris OpenGL Engine';
+    return getParam.call(this, p);
+};
+"""
 
 def load_accounts():
     with open(PROJECT_ROOT / 'accounts.yaml', 'r', encoding='utf-8') as f:
@@ -28,15 +60,14 @@ def type_human(page, selector, text):
 
 def click_captcha(page):
     """点击阿里云验证码 checkbox"""
-    for attempt in range(10):
+    for attempt in range(15):
         try:
             el = page.locator('#aliyunCaptcha-checkbox-icon')
             if el.is_visible(timeout=2000):
                 el.click()
                 print(f"  🤖 点击验证码 (第{attempt+1}次)")
-                time.sleep(2)
-                # 检查弹窗是否消失（验证通过）
-                if not page.locator('#aliyunCaptcha-window-popup.window-show').is_visible(timeout=2000):
+                time.sleep(3)
+                if not page.locator('#aliyunCaptcha-window-popup.window-show').is_visible(timeout=3000):
                     print("  ✅ 验证通过！")
                     return True
         except:
@@ -51,65 +82,61 @@ def login_account(account, browser, all_tokens):
     print(f"[{name}] {email}")
     print(f"{'='*60}")
 
-    page = browser.new_page()
-    page.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+    context = browser.new_context(
+        viewport={'width': 1280, 'height': 720},
+        user_agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+        locale='zh-CN',
+        timezone_id='Asia/Shanghai',
+    )
+    page = context.new_page()
+    page.add_init_script(STEALTH_JS)
 
-    # 1. 访问页面
     print("🌐 访问...")
-    page.goto('https://mineru.net/apiManage/token')
+    page.goto('https://mineru.net/apiManage/token', wait_until='networkidle')
     time.sleep(2)
 
-    # 2. 点击右上角"登录"
     print("🖱️  点击登录...")
     try:
-        page.get_by_text("登录", exact=True).first.click()
+        page.get_by_text("登录", exact=True).first.click(timeout=10000)
         time.sleep(3)
     except:
         print("  ⚠️  未找到登录按钮")
-        page.close()
+        context.close()
         return False
 
-    # 3. 等待 SSO 登录表单
     try:
         page.wait_for_selector('input[placeholder="邮箱/手机号/用户名"]', timeout=10000)
     except:
         print("  ⚠️  登录表单未出现")
-        page.close()
+        context.close()
         return False
 
-    # 4. 输入凭据
     print("📝 输入...")
     type_human(page, 'input[placeholder="邮箱/手机号/用户名"]', email)
     time.sleep(0.5)
     type_human(page, 'input[type="password"]', password)
     time.sleep(1)
 
-    # 5. 点击登录提交（表单内的按钮，用 last 避免选到导航栏的）
     print("🖱️  提交...")
     page.locator('button.loginButton--wFHGh').click()
-    time.sleep(3)
+    time.sleep(4)
 
-    # 6. 自动点击验证码
     print("🔍 处理验证码...")
     captcha_ok = click_captcha(page)
     if not captcha_ok:
-        print(f"  ⏸️  请手动点击验证 - {name}")
+        print(f"  ⏸️  验证码未自动通过 - {name}")
 
-    # 7. 等待登录成功
     print("🔄 检测中（最多60秒）...")
     for i in range(60):
         time.sleep(1)
-
-        cookies = {c['name']: c['value'] for c in page.context.cookies()
+        cookies = {c['name']: c['value'] for c in context.cookies()
                   if c['name'] in ['uaa-token', 'opendatalab_session']}
 
         if len(cookies) >= 2:
             print(f"✅ 登录成功！（{i+1}秒）")
-
             uaa_token = cookies['uaa-token']
             headers = {'authorization': f'Bearer {uaa_token}', 'content-type': 'application/json'}
 
-            # 删除旧 Token
             r = requests.get('https://mineru.net/api/v4/tokens', headers=headers, timeout=10)
             if r.status_code == 200:
                 token_list = r.json()['data'].get('list', [])
@@ -118,7 +145,6 @@ def login_account(account, browser, all_tokens):
                     for token in token_list:
                         requests.delete(f'https://mineru.net/api/v4/tokens/{token["id"]}', headers=headers)
 
-            # 创建新 Token
             ts = datetime.now().strftime("%Y%m%d%H%M%S")
             token_name = f"token-{ts}"
             r = requests.post('https://mineru.net/api/v4/tokens', headers=headers,
@@ -132,23 +158,23 @@ def login_account(account, browser, all_tokens):
                     'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                     'expired_at': result['expired_at']
                 }
-                page.close()
+                context.close()
                 return True
             else:
                 print(f"❌ Token 创建失败: {r.status_code}")
 
-        # 每15秒再试一次验证码
         if (i+1) % 15 == 0:
             click_captcha(page)
             print(f"  [{i+1}s]...")
 
     print("❌ 超时")
-    page.close()
+    context.close()
     return False
 
 def main():
+    mode = "headed（有界面）" if HEADED else "headless（无界面）"
     print("="*60)
-    print("批量登录（全自动）")
+    print(f"批量登录（全自动 - {mode}）")
     print("="*60)
 
     accounts = load_accounts()
@@ -156,9 +182,16 @@ def main():
     print(f"\n共 {len(accounts)} 个账户\n")
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=False, args=[
-            '--disable-blink-features=AutomationControlled',
-        ])
+        browser = p.chromium.launch(
+            headless=not HEADED,
+            args=[
+                '--disable-blink-features=AutomationControlled',
+                '--disable-features=IsolateOrigins,site-per-process',
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+            ]
+        )
 
         success_count = 0
         for i, account in enumerate(accounts, 1):

@@ -92,10 +92,14 @@ vi config/accounts.yaml  # 填入账户信息
 
 ### 批量登录获取Token
 
-> ⚠️ **需要图形界面环境（macOS/Windows/Linux桌面）**，不支持无UI的服务器环境。
+> 默认 **headless 模式**（无界面），可在 macOS/Windows/Linux 服务器上运行。
 
 ```bash
+# 默认 headless（无界面，推荐）
 .venv/bin/python3 src/batch_login.py
+
+# 需要调试时打开浏览器界面
+.venv/bin/python3 src/batch_login.py --headed
 ```
 
 脚本会自动完成以下流程：
@@ -448,10 +452,14 @@ AI: 好的，我来处理这个PDF文件。
 
 ### 批量登录
 
-> ⚠️ **需要图形界面环境**（macOS/Windows/Linux桌面），脚本会打开浏览器窗口。
+> 默认 **headless 模式**（无界面），可在 macOS/Windows/Linux 服务器上运行。
 
 ```bash
+# 默认 headless（无界面，推荐）
 .venv/bin/python3 src/batch_login.py
+
+# 需要调试时打开浏览器界面
+.venv/bin/python3 src/batch_login.py --headed
 ```
 
 **全自动流程：**
