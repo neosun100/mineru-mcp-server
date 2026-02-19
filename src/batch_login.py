@@ -196,9 +196,15 @@ def main():
         success_count = 0
         for i, account in enumerate(accounts, 1):
             print(f"\n[{i}/{len(accounts)}]")
-            if login_account(account, browser, all_tokens):
-                success_count += 1
-                save_all_tokens(all_tokens)
+            # 最多重试2次
+            for attempt in range(2):
+                if login_account(account, browser, all_tokens):
+                    success_count += 1
+                    save_all_tokens(all_tokens)
+                    break
+                elif attempt == 0:
+                    print(f"  🔄 重试...")
+                    time.sleep(3)
             if i < len(accounts):
                 time.sleep(2)
 

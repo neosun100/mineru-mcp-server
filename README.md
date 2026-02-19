@@ -3,7 +3,7 @@
 <div align="center">
 
 ![MinerU](https://img.shields.io/badge/MinerU-Document%20Processing-blue)
-![Version](https://img.shields.io/badge/version-3.0.0-green)
+![Version](https://img.shields.io/badge/version-3.2.0-green)
 ![Python](https://img.shields.io/badge/python-3.10+-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![MCP](https://img.shields.io/badge/MCP-Model%20Context%20Protocol-purple)
@@ -297,6 +297,21 @@ mineru-mcp-server/
 - [拆分逻辑分析](SPLIT_LOGIC_ANALYSIS.md) - 智能拆分算法
 
 ## 🔄 版本历史
+
+### v3.2.0 (2026-02-19) - 全面优化
+- ✨ URL 文件直接处理（自动下载→上传→处理）
+- ✨ URL 格式智能识别（magic bytes fallback）
+- ✨ Token 过期自动检测（处理前检查）
+- 🔧 修复 get_token_status 路径错误
+- 🔧 移除未实现的工具（process_urls、extract_info）
+- 🔧 完善 requirements.txt（9个依赖）
+- 🔧 日志级别优化，批量登录增加重试
+
+### v3.1.0 (2026-02-19) - Headless 全自动登录
+- ✨ 默认 headless 模式（无需 UI，Linux 服务器可用）
+- ✨ 自动点击阿里云验证码（`#aliyunCaptcha-checkbox-icon`）
+- ✨ 完整 stealth JS 伪装（WebGL/plugins/permissions）
+- ✨ `--headed` 参数可开启浏览器界面调试
 
 ### v3.0.0 (2026-01-25) - 完整生产级解决方案
 - ✨ 批量异步并行处理（性能提升10倍）

@@ -13,7 +13,7 @@ from typing import Any, Sequence
 # 添加详细日志
 import logging
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=logging.INFO,
     format='%(asctime)s [%(levelname)s] %(message)s',
     handlers=[
         logging.FileHandler('/tmp/mineru_mcp_debug.log'),
@@ -152,73 +152,6 @@ async def list_tools() -> list[Tool]:
         ),
         
         Tool(
-            name="process_urls",
-            description="""批量处理URL列表。
-            
-功能：
-- 批量处理多个URL
-- 自动验证URL可访问性
-- 并行处理
-- 汇总结果
-
-适用场景：
-- 批量下载论文
-- 批量处理网页
-- 批量识别在线图片""",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "urls": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "URL列表"
-                    },
-                    "max_workers": {
-                        "type": "number",
-                        "description": "最大并行度（默认10）"
-                    }
-                },
-                "required": ["urls"]
-            }
-        ),
-        
-        Tool(
-            name="extract_info",
-            description="""从文档中提取结构化信息。
-            
-支持的提取类型：
-- invoice：发票信息（发票号、金额、日期等）
-- contract：合同信息（签约方、金额、日期等）
-- form：表单信息
-- custom：自定义字段
-
-功能：
-- 使用KIE技术提取
-- 结构化输出
-- 支持批量提取""",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "file_path": {
-                        "type": "string",
-                        "description": "文件路径或URL"
-                    },
-                    "extract_type": {
-                        "type": "string",
-                        "enum": ["invoice", "contract", "form", "custom"],
-                        "description": "提取类型"
-                    },
-                    "fields": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "要提取的字段列表（custom类型时必需）"
-                    }
-                },
-                "required": ["file_path", "extract_type"]
-            }
-        ),
-        
-        Tool(
             name="get_token_status",
             description="""查询Token状态。
             
@@ -243,6 +176,29 @@ async def call_tool(name: str, arguments: dict) -> Sequence[TextContent | ImageC
     logger.info(f"参数: {arguments}")
     
     try:
+        # Token 过期检查（处理文档前）
+        if name in ("process_document", "process_directory"):
+            from datetime import datetime, timezone
+            project_root = Path(__file__).parent.parent
+            tokens_file = project_root / 'all_tokens.json'
+            try:
+                with open(tokens_file, 'r') as f:
+                    tokens = json.load(f)
+                now = datetime.now(timezone.utc)
+                expired = [e for e, i in tokens.items()
+                          if (datetime.fromisoformat(i['expired_at'].replace('Z', '+00:00')) - now).days <= 0]
+                if expired:
+                    return [TextContent(type="text", text=json.dumps({
+                        "status": "token_expired",
+                        "expired_count": len(expired),
+                        "message": f"{len(expired)}个Token已过期，请先执行续期: .venv/bin/python3 src/batch_login.py",
+                    }, ensure_ascii=False))]
+            except FileNotFoundError:
+                return [TextContent(type="text", text=json.dumps({
+                    "status": "no_tokens",
+                    "message": "未找到Token文件，请先执行: .venv/bin/python3 src/batch_login.py",
+                }, ensure_ascii=False))]
+
         # 延迟导入处理器
         if processor is None:
             logger.info("首次调用，导入处理器...")
@@ -360,28 +316,11 @@ async def call_tool(name: str, arguments: dict) -> Sequence[TextContent | ImageC
                 text=json.dumps(summary, indent=2, ensure_ascii=False)
             )]
         
-        elif name == "process_urls":
-            # 批量处理URL
-            urls = arguments["urls"]
-            # TODO: 实现批量URL处理
-            return [TextContent(
-                type="text",
-                text=json.dumps({"status": "todo", "message": "功能开发中"})
-            )]
-        
-        elif name == "extract_info":
-            # 提取结构化信息
-            # TODO: 实现KIE提取
-            return [TextContent(
-                type="text",
-                text=json.dumps({"status": "todo", "message": "功能开发中"})
-            )]
-        
         elif name == "get_token_status":
             logger.info("处理 get_token_status 工具调用")
             # 查询Token状态
-            script_dir = Path(__file__).parent
-            tokens_file = script_dir / 'all_tokens.json'
+            project_root = Path(__file__).parent.parent  # 项目根目录
+            tokens_file = project_root / 'all_tokens.json'
             logger.info(f"Token文件路径: {tokens_file}")
             
             with open(tokens_file, 'r') as f:

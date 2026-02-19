@@ -51,7 +51,7 @@ class FileValidator:
     async def validate_url(session: AsyncSession, url: str) -> Tuple[bool, str, Dict]:
         """验证URL（真正异步）"""
         try:
-            response = await session.head(url, timeout=10)
+            response = await session.head(url, timeout=10, allow_redirects=True)
             
             if response.status_code != 200:
                 return False, f"URL无法访问: {response.status_code}", {}
@@ -62,6 +62,27 @@ class FileValidator:
             
             content_type = response.headers.get('content-type', '')
             format = FileValidator._guess_format_from_url(url, content_type)
+            
+            # Fallback: 下载前几个字节检查文件魔数
+            if not format:
+                resp = await session.get(url, timeout=10, headers={'Range': 'bytes=0-16'})
+                head = resp.content[:16]
+                if head.startswith(b'%PDF'):
+                    format = 'pdf'
+                elif head.startswith(b'PK'):
+                    # ZIP-based: docx/pptx/xlsx
+                    if any(ext in url.lower() for ext in ['pptx', 'ppt']):
+                        format = 'pptx'
+                    elif any(ext in url.lower() for ext in ['docx', 'doc']):
+                        format = 'docx'
+                    else:
+                        format = 'docx'  # default ZIP-based to docx
+                elif head[:3] in (b'\xff\xd8\xff', ):
+                    format = 'jpg'
+                elif head[:8] == b'\x89PNG\r\n\x1a\n':
+                    format = 'png'
+                elif b'<html' in head.lower() or b'<!doctype' in head.lower():
+                    format = 'html'
             
             if not format:
                 return False, f"无法识别文件格式", {}
@@ -429,10 +450,53 @@ class MinerUAsyncProcessor:
                         full_zip_url = result.get('full_zip_url')
                         logger.info(f"处理完成: {full_zip_url}")
                 else:
-                    # URL处理（TODO）
-                    logger.error("URL处理暂未实现")
-                    print("❌ URL处理暂未实现")
-                    return None
+                    # URL处理：先下载到临时文件，再上传处理
+                    logger.info("URL文件，先下载到本地")
+                    print(f"\n🌐 下载URL文件...")
+                    
+                    import tempfile
+                    url = file_path
+                    file_name = file_info['name']
+                    if '.' not in file_name:
+                        file_name = f"{file_name}.{file_info['format']}"
+                    
+                    tmp_path = Path(tempfile.gettempdir()) / file_name
+                    
+                    resp = await session.get(url, timeout=120)
+                    if resp.status_code != 200:
+                        print(f"❌ 下载失败: HTTP {resp.status_code}")
+                        return None
+                    
+                    tmp_path.write_bytes(resp.content)
+                    logger.info(f"下载完成: {tmp_path} ({tmp_path.stat().st_size / 1024 / 1024:.1f}MB)")
+                    print(f"✅ 下载完成: {tmp_path.stat().st_size / 1024 / 1024:.1f}MB")
+                    
+                    upload_options = {
+                        'model_version': options.get('model_version', 'vlm'),
+                        'enable_formula': options.get('enable_formula', True),
+                        'enable_table': options.get('enable_table', True)
+                    }
+                    if file_info['format'] == 'html':
+                        upload_options['model_version'] = 'MinerU-HTML'
+                    
+                    batch_id = await self.client.upload_file(session, str(tmp_path), **upload_options)
+                    
+                    if not batch_id:
+                        print("❌ 上传失败")
+                        return None
+                    
+                    print(f"✅ 已上传，batch_id: {batch_id}")
+                    
+                    results = await self.client.wait_for_completion(session, batch_id)
+                    if not results or len(results) == 0 or results[0].get('state') != 'done':
+                        err = results[0].get('err_msg', '未知错误') if results else '无结果'
+                        print(f"❌ 处理失败: {err}")
+                        return None
+                    
+                    full_zip_url = results[0].get('full_zip_url')
+                    # URL文件输出到临时目录
+                    output_path = Path(tempfile.gettempdir())
+                    file_path = str(tmp_path)  # 后续整理输出用本地路径
                 
                 # 4. 下载并解压（真正异步）
                 logger.info("开始下载结果")
