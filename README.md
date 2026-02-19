@@ -171,14 +171,27 @@ python3 batch_login.py
   "mcpServers": {
     "mineru": {
       "command": "/path/to/mineru-mcp-server/.venv/bin/python3",
-      "args": ["/path/to/mineru-mcp-server/mineru_mcp_server.py"],
+      "args": ["/path/to/mineru-mcp-server/src/mineru_mcp_server.py"],
       "env": {
-        "PYTHONPATH": "/path/to/mineru-mcp-server"
+        "PYTHONPATH": "/path/to/mineru-mcp-server/src"
       }
     }
   }
 }
 ```
+
+### Kiro Skill 安装（可选）
+
+将项目中的 Skill 复制到 Kiro 配置目录，即可通过自然语言自动管理 Token：
+
+```bash
+cp -r skills/mineru-token-manager ~/.kiro/skills/
+```
+
+安装后，AI 助手会自动：
+- 处理文档前检查 Token 是否过期
+- 过期时自动执行 headless 批量登录续期
+- 续期完成后继续处理文档
 
 ## 🎯 使用
 
