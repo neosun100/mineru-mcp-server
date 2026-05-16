@@ -24,11 +24,14 @@ env/
 # 归档文件
 archive/
 
-# 测试文件（排除主测试文件）
+# 测试文件（排除根目录散落的测试，但保留 tests/ 目录下的正式测试）
 *_test.py
 test_*.py
 !test_all.py
 !test_workflow.sh
+!tests/unit/test_*.py
+!tests/integration/test_*.py
+!tests/e2e/test_*.py
 
 # 其他敏感信息
 *.key

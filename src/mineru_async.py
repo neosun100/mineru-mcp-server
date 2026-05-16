@@ -28,7 +28,10 @@ class FileValidator:
     """文件验证器"""
     
     MAX_SIZE = 200 * 1024 * 1024  # 200MB
-    MAX_PAGES = 600
+    # 服务端实际硬限制是 200 页（自 2026 年某次更新后），超过会返回
+    # "number of pages exceeds limit (200 pages)" 错误。
+    # 阈值定义为服务端真值，业务调用方决定是否拆分（推荐拆成 ≤180 留 buffer）。
+    MAX_PAGES = 200
     
     SUPPORTED_FORMATS = {
         'pdf': 'application/pdf',
@@ -197,20 +200,143 @@ class MinerUAsyncClient:
         """随机选择Token"""
         email = random.choice(list(self.tokens.keys()))
         return self.tokens[email]['token']
-    
+
+    # ────────────────────────────────────────────────────────────
+    # v4.0.0: 构造 v4 API 请求 payload，区分顶层参数和 file 级参数
+    # ────────────────────────────────────────────────────────────
+
+    # 顶层参数（请求体根级，对所有文件生效）
+    _BATCH_LEVEL_KEYS = {
+        'model_version', 'enable_formula', 'enable_table',
+        'language', 'extra_formats',
+    }
+    # file 级参数（每个 file 对象内）
+    _FILE_LEVEL_KEYS = {
+        'name', 'url', 'is_ocr', 'data_id', 'page_ranges',
+    }
+    # /extract/task 单文件接口的所有合法参数（顶层）
+    _SINGLE_TASK_KEYS = {
+        'url', 'model_version', 'is_ocr', 'enable_formula', 'enable_table',
+        'language', 'data_id', 'callback', 'seed', 'extra_formats',
+        'page_ranges', 'no_cache', 'cache_tolerance',
+    }
+
+    def _split_options(self, options: Dict) -> tuple[Dict, Dict]:
+        """把混合 options 拆成 (顶层 batch_opts, 单文件 file_opts)。"""
+        batch_opts = {k: v for k, v in options.items()
+                      if k in self._BATCH_LEVEL_KEYS and v is not None}
+        file_opts = {k: v for k, v in options.items()
+                     if k in self._FILE_LEVEL_KEYS and v is not None}
+        return batch_opts, file_opts
+
+    async def submit_url_task(
+        self,
+        session: AsyncSession,
+        url: str,
+        **options,
+    ) -> Optional[str]:
+        """v4 直接提交 URL 解析任务（不下载到本地）。
+
+        端点：POST /api/v4/extract/task
+        返回：task_id（注意不是 batch_id）。
+        如果 URL 无法访问（如 GitHub/AWS 网络受限），调用方应 catch 后兜底走下载流程。
+        """
+        token = self._get_random_token()
+        headers = {
+            'authorization': f'Bearer {token}',
+            'content-type': 'application/json',
+        }
+        # 过滤出 v4 单任务接口接受的参数
+        payload = {k: v for k, v in options.items()
+                   if k in self._SINGLE_TASK_KEYS and v is not None}
+        payload['url'] = url
+
+        try:
+            response = await session.post(
+                f"{self.base_url}/extract/task",
+                headers=headers,
+                json=payload,
+                timeout=30,
+            )
+            result = response.json()
+        except Exception as e:
+            logger.warning(f"submit_url_task 网络异常: {e}")
+            return None
+
+        if result.get('code') != 0:
+            logger.warning(f"submit_url_task 返回非 0: code={result.get('code')} msg={result.get('msg')}")
+            return None
+        return result['data'].get('task_id')
+
+    async def get_task_result(
+        self,
+        session: AsyncSession,
+        task_id: str,
+    ) -> Optional[Dict]:
+        """查询单文件任务结果（v4 /extract/task/{id}）。"""
+        token = self._get_random_token()
+        headers = {'authorization': f'Bearer {token}'}
+        try:
+            resp = await session.get(
+                f"{self.base_url}/extract/task/{task_id}",
+                headers=headers, timeout=30,
+            )
+            result = resp.json()
+        except Exception as e:
+            logger.warning(f"get_task_result 网络异常: {e}")
+            return None
+        if result.get('code') != 0:
+            return None
+        return result.get('data')
+
+    async def wait_for_single_task(
+        self,
+        session: AsyncSession,
+        task_id: str,
+        max_wait: int = 600,
+        progress_callback=None,
+    ) -> Optional[Dict]:
+        """轮询单任务直到完成。返回与 batch 任务相同结构的 dict。"""
+        start = time.time()
+        while time.time() - start < max_wait:
+            data = await self.get_task_result(session, task_id)
+            if data is None:
+                await asyncio.sleep(2)
+                continue
+            state = data.get('state')
+            if state == 'done':
+                return data
+            if state == 'failed':
+                return data
+            if state == 'running' and progress_callback:
+                p = data.get('extract_progress', {})
+                extracted = p.get('extracted_pages', 0)
+                total = p.get('total_pages', 0)
+                if total > 0:
+                    await progress_callback(extracted, total, f"解析中 {extracted}/{total}页")
+            await asyncio.sleep(2)
+        return None
+
     async def upload_file(self, session: AsyncSession, file_path: str, **options) -> Optional[str]:
-        """上传本地文件（真正异步）"""
+        """上传本地文件（真正异步）。
+
+        v4.0.0 升级：支持完整参数透传。
+          - 顶层参数：model_version / enable_formula / enable_table / language / extra_formats
+          - 文件级参数：is_ocr / data_id / page_ranges
+        """
         token = self._get_random_token()
         headers = {
             'authorization': f'Bearer {token}',
             'content-type': 'application/json'
         }
-        
+
         file_name = Path(file_path).name
-        
-        # 1. 获取上传链接（异步）
-        data = {'files': [{'name': file_name}], **options}
-        
+
+        # 1. 拆分参数：file 级 vs batch 级
+        batch_opts, file_opts = self._split_options(options)
+        file_entry = {'name': file_name, **file_opts}
+        data = {'files': [file_entry], **batch_opts}
+
         response = await session.post(
             f"{self.base_url}/file-urls/batch",
             headers=headers,
@@ -218,11 +344,11 @@ class MinerUAsyncClient:
             timeout=30
         )
         result = response.json()
-        
+
         if result['code'] != 0:
             print(f"❌ 获取上传链接失败: {result.get('msg')}")
             return None
-        
+
         batch_id = result['data']['batch_id']
         upload_url = result['data']['file_urls'][0]
         print(f"✅ 获取上传链接成功")
@@ -257,7 +383,7 @@ class MinerUAsyncClient:
             return result['data']['extract_result']
         return None
     
-    async def wait_for_completion(self, session: AsyncSession, batch_id: str, max_wait: int = 600) -> Optional[List[Dict]]:
+    async def wait_for_completion(self, session: AsyncSession, batch_id: str, max_wait: int = 600, progress_callback=None) -> Optional[List[Dict]]:
         """等待批量任务完成（真正异步）"""
         start_time = time.time()
         
@@ -280,6 +406,10 @@ class MinerUAsyncClient:
                             total = progress.get('total_pages', 0)
                             if total > 0:
                                 print(f"  进度: {extracted}/{total}页", end='\r')
+                                if progress_callback:
+                                    await progress_callback(extracted, total, f"处理中: {extracted}/{total}页")
+                        elif progress_callback:
+                            await progress_callback(0, 100, f"状态: {state}")
                 
                 if all_done:
                     return results
@@ -337,16 +467,24 @@ class MinerUAsyncProcessor:
         self.client = MinerUAsyncClient()
         self.max_workers = max_workers
     
-    async def process_file(self, file_path: str, output_dir: str = "./output", **options) -> Optional[Dict]:
-        """处理单个文件（真正异步）"""
+    async def process_file(self, file_path: str, output_dir: str = "./output", progress_callback=None, **options) -> Optional[Dict]:
+        """处理单个文件（真正异步）
+        
+        progress_callback: async def(progress: float, total: float, message: str)
+        """
         import logging
         logger = logging.getLogger(__name__)
+        
+        async def _progress(progress, total, message):
+            if progress_callback:
+                await progress_callback(progress, total, message)
         
         logger.info(f"process_file() 开始: {file_path}")
         print(f"\n📄 处理: {file_path}")
         
         try:
             # 1. 验证文件
+            await _progress(1, 10, "验证文件...")
             async with AsyncSession() as session:
                 if FileValidator.is_url(file_path):
                     logger.info("检测到URL")
@@ -373,19 +511,32 @@ class MinerUAsyncProcessor:
                 if not file_info['is_url']:
                     logger.info("开始上传本地文件")
                     print(f"\n📤 上传本地文件...")
-                    
-                    # 智能参数设置
+                    await _progress(2, 10, f"上传文件: {file_info['name']} ({file_info['size']/1024/1024:.1f}MB)...")
+
+                    # v4.0.0 智能参数：透传用户提供的所有官方参数
+                    fmt = file_info['format']
                     upload_options = {
                         'model_version': options.get('model_version', 'vlm'),
                         'enable_formula': options.get('enable_formula', True),
-                        'enable_table': options.get('enable_table', True)
-                        # 不设置 language，让API自动检测
+                        'enable_table': options.get('enable_table', True),
                     }
-                    
-                    # HTML文件使用专用模型
-                    if file_info['format'] == 'html':
+                    # 可选官方参数透传（None 时不带）
+                    for key in ('language', 'is_ocr', 'page_ranges',
+                                'extra_formats', 'data_id'):
+                        if options.get(key) is not None:
+                            upload_options[key] = options[key]
+
+                    # 图片自动开启 OCR（用户没显式设置时）
+                    if fmt in ('png', 'jpg', 'jpeg') and 'is_ocr' not in upload_options:
+                        upload_options['is_ocr'] = True
+
+                    # 非 PDF/图片格式使用 pipeline 模型（vlm 对 PPTX/DOC 等会卡在 pending）
+                    if fmt == 'html':
                         upload_options['model_version'] = 'MinerU-HTML'
-                    
+                    elif fmt not in ('pdf', 'png', 'jpg', 'jpeg') and 'model_version' not in options:
+                        upload_options['model_version'] = 'pipeline'
+                        logger.info(f"非PDF格式({fmt})，自动切换到 pipeline 模型")
+
                     batch_id = await self.client.upload_file(session, file_path, **upload_options)
                     
                     if not batch_id:
@@ -395,112 +546,132 @@ class MinerUAsyncProcessor:
                     
                     logger.info(f"上传成功: batch_id={batch_id}")
                     print(f"✅ 文件已上传，batch_id: {batch_id}")
+                    await _progress(3, 10, "文件已上传，等待服务端处理...")
                     
-                    # 3. 检查是否需要使用page_ranges
+                    # 3. 服务端硬限制：超过 200 页直接返回错误。
+                    #    本函数只处理单文件单批次，不再做"伪 page_ranges"假拆分。
+                    #    真正的物理拆分由 batch_async 入口或 process_with_auto_split 协调，
+                    #    超页文件应在调用本函数之前先拆成 ≤180 页的 chunks。
                     pages = file_info.get('pages')
-                    if pages and pages > 600:
-                        logger.info(f"文件超过600页({pages}页)，需要使用page_ranges处理")
-                        print(f"\n⚠️  文件有{pages}页，超过600页限制")
-                        print(f"📦 使用page_ranges参数拆分处理...")
-                        
-                        # 创建page_ranges请求
-                        chunk_count = (pages + 599) // 600
-                        print(f"   将拆分为 {chunk_count} 个请求")
-                        
-                        # 等待文件上传完成并自动提交任务
-                        logger.info("等待文件上传完成...")
-                        await asyncio.sleep(5)  # 等待文件扫描
-                        
-                        # 获取结果
-                        results = await self.client.wait_for_completion(session, batch_id)
-                        
-                        if not results or len(results) == 0:
-                            logger.error("处理失败")
-                            print("❌ 处理失败")
-                            return None
-                        
-                        result = results[0]
-                        
-                        if result.get('state') != 'done':
-                            logger.error(f"处理失败: {result.get('err_msg')}")
-                            print(f"❌ 处理失败: {result.get('err_msg')}")
-                            return None
-                        
-                        full_zip_url = result.get('full_zip_url')
-                        logger.info(f"处理完成: {full_zip_url}")
-                    else:
-                        # 4. 等待处理完成（真正异步）
-                        logger.info("等待处理完成")
-                        print(f"\n⏳ 等待处理完成...")
-                        
-                        results = await self.client.wait_for_completion(session, batch_id)
-                        
-                        if not results or len(results) == 0:
-                            logger.error("处理失败")
-                            print("❌ 处理失败")
-                            return None
-                        
-                        result = results[0]
-                        
-                        if result.get('state') != 'done':
-                            logger.error(f"处理失败: {result.get('err_msg')}")
-                            print(f"❌ 处理失败: {result.get('err_msg')}")
-                            return None
-                        
-                        full_zip_url = result.get('full_zip_url')
-                        logger.info(f"处理完成: {full_zip_url}")
-                else:
-                    # URL处理：先下载到临时文件，再上传处理
-                    logger.info("URL文件，先下载到本地")
-                    print(f"\n🌐 下载URL文件...")
-                    
-                    import tempfile
-                    url = file_path
-                    file_name = file_info['name']
-                    if '.' not in file_name:
-                        file_name = f"{file_name}.{file_info['format']}"
-                    
-                    tmp_path = Path(tempfile.gettempdir()) / file_name
-                    
-                    resp = await session.get(url, timeout=120)
-                    if resp.status_code != 200:
-                        print(f"❌ 下载失败: HTTP {resp.status_code}")
+                    if pages and pages > FileValidator.MAX_PAGES:
+                        msg = (
+                            f"文件 {pages} 页，超过服务端 {FileValidator.MAX_PAGES} 页限制。"
+                            f"请先用 split_large_file.split_large_pdf() 物理拆分后再处理。"
+                        )
+                        logger.error(msg)
+                        print(f"❌ {msg}")
                         return None
-                    
-                    tmp_path.write_bytes(resp.content)
-                    logger.info(f"下载完成: {tmp_path} ({tmp_path.stat().st_size / 1024 / 1024:.1f}MB)")
-                    print(f"✅ 下载完成: {tmp_path.stat().st_size / 1024 / 1024:.1f}MB")
-                    
-                    upload_options = {
+
+                    # 4. 等待处理完成（真正异步）
+                    logger.info("等待处理完成")
+                    print(f"\n⏳ 等待处理完成...")
+
+                    results = await self.client.wait_for_completion(session, batch_id, progress_callback=progress_callback)
+
+                    if not results or len(results) == 0:
+                        logger.error("处理失败")
+                        print("❌ 处理失败")
+                        return None
+
+                    result = results[0]
+
+                    if result.get('state') != 'done':
+                        logger.error(f"处理失败: {result.get('err_msg')}")
+                        print(f"❌ 处理失败: {result.get('err_msg')}")
+                        return None
+
+                    full_zip_url = result.get('full_zip_url')
+                    logger.info(f"处理完成: {full_zip_url}")
+                else:
+                    # URL 处理 v4.0.0 升级：
+                    #   1. 优先调用 v4 /extract/task 直接传 URL（服务端自己抓）
+                    #   2. 失败兜底：下载到本地再走 file-urls/batch
+                    logger.info("URL 文件 — 尝试服务端直传…")
+                    print(f"\n🌐 检测到 URL，尝试服务端直传…")
+                    await _progress(2, 10, "提交 URL 解析任务（服务端直接抓）…")
+
+                    url = file_path
+                    fmt = file_info['format']
+
+                    # 构造 v4 单任务参数
+                    submit_options = {
                         'model_version': options.get('model_version', 'vlm'),
                         'enable_formula': options.get('enable_formula', True),
-                        'enable_table': options.get('enable_table', True)
+                        'enable_table': options.get('enable_table', True),
                     }
-                    if file_info['format'] == 'html':
-                        upload_options['model_version'] = 'MinerU-HTML'
-                    
-                    batch_id = await self.client.upload_file(session, str(tmp_path), **upload_options)
-                    
-                    if not batch_id:
-                        print("❌ 上传失败")
-                        return None
-                    
-                    print(f"✅ 已上传，batch_id: {batch_id}")
-                    
-                    results = await self.client.wait_for_completion(session, batch_id)
-                    if not results or len(results) == 0 or results[0].get('state') != 'done':
-                        err = results[0].get('err_msg', '未知错误') if results else '无结果'
-                        print(f"❌ 处理失败: {err}")
-                        return None
-                    
-                    full_zip_url = results[0].get('full_zip_url')
-                    # URL文件输出到临时目录
-                    output_path = Path(tempfile.gettempdir())
+                    for key in ('language', 'is_ocr', 'page_ranges',
+                                'extra_formats', 'data_id',
+                                'no_cache', 'cache_tolerance'):
+                        if options.get(key) is not None:
+                            submit_options[key] = options[key]
+                    if fmt in ('png', 'jpg', 'jpeg') and 'is_ocr' not in submit_options:
+                        submit_options['is_ocr'] = True
+                    if fmt == 'html':
+                        submit_options['model_version'] = 'MinerU-HTML'
+                    elif fmt not in ('pdf', 'png', 'jpg', 'jpeg') and 'model_version' not in options:
+                        submit_options['model_version'] = 'pipeline'
+
+                    task_id = await self.client.submit_url_task(session, url, **submit_options)
+
+                    full_zip_url = None
+                    if task_id:
+                        # URL 直传成功，走单任务轮询
+                        logger.info(f"URL 直传成功 task_id={task_id}")
+                        print(f"✅ 已提交（task_id={task_id[:12]}…），等待解析完成…")
+                        task_data = await self.client.wait_for_single_task(
+                            session, task_id, progress_callback=progress_callback,
+                        )
+                        if task_data and task_data.get('state') == 'done':
+                            full_zip_url = task_data.get('full_zip_url')
+                        else:
+                            err_msg = task_data.get('err_msg', '未知') if task_data else '轮询超时'
+                            logger.warning(f"URL 直传失败：{err_msg}，降级到本地下载…")
+                            print(f"⚠️  URL 直传失败：{err_msg}，降级为本地下载…")
+
+                    if not full_zip_url:
+                        # 兜底：下载到本地再上传
+                        import tempfile as _tempfile
+                        file_name = file_info['name']
+                        if '.' not in file_name:
+                            file_name = f"{file_name}.{fmt}"
+                        tmp_path = Path(_tempfile.gettempdir()) / file_name
+
+                        await _progress(3, 10, "降级：下载 URL 文件到本地…")
+                        resp = await session.get(url, timeout=120)
+                        if resp.status_code != 200:
+                            print(f"❌ 下载失败: HTTP {resp.status_code}")
+                            return None
+                        tmp_path.write_bytes(resp.content)
+                        logger.info(f"下载完成: {tmp_path}")
+                        print(f"✅ 下载完成: {tmp_path.stat().st_size / 1024 / 1024:.1f}MB")
+
+                        # 走 file-urls/batch
+                        batch_id = await self.client.upload_file(
+                            session, str(tmp_path), **submit_options,
+                        )
+                        if not batch_id:
+                            print("❌ 上传失败")
+                            return None
+                        print(f"✅ 已上传，batch_id: {batch_id}")
+
+                        results = await self.client.wait_for_completion(
+                            session, batch_id, progress_callback=progress_callback,
+                        )
+                        if not results or len(results) == 0 or results[0].get('state') != 'done':
+                            err = results[0].get('err_msg', '未知错误') if results else '无结果'
+                            print(f"❌ 处理失败: {err}")
+                            return None
+                        full_zip_url = results[0].get('full_zip_url')
+
+                    # URL 文件输出到临时目录
+                    import tempfile as _tempfile
+                    output_path = Path(_tempfile.gettempdir())
                     file_path = str(tmp_path)  # 后续整理输出用本地路径
                 
                 # 4. 下载并解压（真正异步）
                 logger.info("开始下载结果")
                 print(f"\n📥 下载并解压结果...")
+                await _progress(9, 10, "下载并解压结果...")
                 
                 output_path = Path(output_dir)
                 if not file_info['is_url']:
@@ -525,12 +696,16 @@ class MinerUAsyncProcessor:
                 file_name = Path(file_path).stem
                 md_file = output_path / f"{file_name}.md"
                 images_dir = output_path / f"{file_name}_images"
-                
-                # 复制Markdown
+
+                # 复制 Markdown，并把其中的 `images/xxx` 引用改写成
+                # `{file_name}_images/xxx`，保持 .md 与同目录图片目录的一致。
                 source_md = ResultProcessor.find_markdown(extracted)
                 if source_md:
-                    shutil.copy(source_md, md_file)
-                    logger.info(f"Markdown已复制: {md_file}")
+                    from path_fixer import rewrite_md_image_refs
+                    md_text = Path(source_md).read_text(encoding='utf-8')
+                    md_text = rewrite_md_image_refs(md_text, f"{file_name}_images")
+                    md_file.write_text(md_text, encoding='utf-8')
+                    logger.info(f"Markdown已写入并修复图片引用: {md_file}")
                     print(f"✅ Markdown: {md_file}")
                 
                 # 复制图片
@@ -544,6 +719,7 @@ class MinerUAsyncProcessor:
                     print(f"✅ 图片: {images_dir} ({image_count}个)")
                 
                 logger.info("处理完成")
+                await _progress(10, 10, "处理完成 ✅")
                 return {
                     'source': file_path,
                     'source_type': 'url' if file_info['is_url'] else 'file',

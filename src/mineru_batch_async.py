@@ -55,12 +55,22 @@ class BatchAsyncProcessor:
         self.max_concurrent = max_concurrent
         self.semaphore = asyncio.Semaphore(max_concurrent)
     
-    async def process_files_parallel(self, file_paths: List[str]) -> List[Dict]:
+    async def process_files_parallel(
+        self,
+        file_paths: List[str],
+        options: Optional[Dict] = None,
+    ) -> List[Dict]:
         """
         真正的批量异步并行处理
-        
+
         多个文件同时：上传、处理、下载
+
+        Args:
+            file_paths: 文件路径列表
+            options:    传给 upload_file 的统一参数（v4.0.0），如
+                        ``{"language": "ch", "is_ocr": True, "extra_formats": ["docx"]}``
         """
+        options = options or {}
         console.print(Panel.fit(
             f"[bold cyan]MinerU 批量异步并行处理[/bold cyan]\n"
             f"[dim]并发数: {self.max_concurrent} | 文件数: {len(file_paths)}[/dim]",
@@ -139,13 +149,27 @@ class BatchAsyncProcessor:
                         progress.update(task_id, description=f"[yellow]📤 {task.file_info['name'][:40]}")
                         
                         async with AsyncSession() as session:
-                            # 上传
+                            # 上传 — v4.0.0 全参数透传
+                            fmt = task.file_info.get('format', '')
                             upload_options = {
-                                'model_version': 'vlm',
-                                'enable_formula': True,
-                                'enable_table': True
+                                'model_version': options.get('model_version', 'vlm'),
+                                'enable_formula': options.get('enable_formula', True),
+                                'enable_table': options.get('enable_table', True),
                             }
-                            
+                            for key in ('language', 'is_ocr', 'page_ranges',
+                                        'extra_formats', 'data_id'):
+                                if options.get(key) is not None:
+                                    upload_options[key] = options[key]
+                            # 图片自动开 OCR
+                            if fmt in ('png', 'jpg', 'jpeg') and 'is_ocr' not in upload_options:
+                                upload_options['is_ocr'] = True
+                            # HTML / Office 智能切模型
+                            if fmt == 'html':
+                                upload_options['model_version'] = 'MinerU-HTML'
+                            elif fmt not in ('pdf', 'png', 'jpg', 'jpeg') \
+                                 and 'model_version' not in options:
+                                upload_options['model_version'] = 'pipeline'
+
                             batch_id = await self.client.upload_file(
                                 session, task.file_path, **upload_options
                             )
@@ -208,11 +232,17 @@ class BatchAsyncProcessor:
                             file_name = Path(task.file_path).stem
                             md_file = output_path / f"{file_name}.md"
                             images_dir = output_path / f"{file_name}_images"
-                            
+
                             source_md = ResultProcessor.find_markdown(extracted)
                             if source_md:
-                                shutil.copy(source_md, md_file)
-                            
+                                # 修复图片引用：MinerU 返回的 .md 用 `images/x` 前缀，
+                                # 我们把图片复制到 `{file_name}_images/`，所以 .md 里
+                                # 也要把 `images/` 改成 `{file_name}_images/`。
+                                from path_fixer import rewrite_md_image_refs
+                                md_text = Path(source_md).read_text(encoding='utf-8')
+                                md_text = rewrite_md_image_refs(md_text, f"{file_name}_images")
+                                md_file.write_text(md_text, encoding='utf-8')
+
                             source_images = Path(extracted) / "images"
                             image_count = 0
                             if source_images.exists():
@@ -335,10 +365,24 @@ if __name__ == '__main__':
         sys.exit(1)
     
     console.print(f"[cyan]找到 {len(files)} 个文件[/cyan]\n")
-    
+
+    # 自动拆分超页 / 超大 PDF（服务端硬限制 200 页 / 200 MB）。
+    # 拆分后每片 ≤ 180 页 / 180 MB，留 buffer。
+    from auto_split import prepare_files, merge_results
+    expanded_files, merge_plans = prepare_files(files)
+    if merge_plans:
+        console.print(f"[yellow]⚠️ 检测到 {len(merge_plans)} 个文件需要拆分，"
+                      f"展开后共 {len(expanded_files)} 个待处理文件[/yellow]\n")
+
     # 批量处理
     processor = BatchAsyncProcessor(max_concurrent=3)
-    results = asyncio.run(processor.process_files_parallel(files))
+    results = asyncio.run(processor.process_files_parallel(expanded_files))
+
+    # 处理完成后合并 chunks
+    if merge_plans:
+        console.print("\n[bold]步骤3: 合并 chunks 输出[/bold]")
+        merged = merge_results(merge_plans)
+        console.print(f"[green]✅ 合并完成 {len(merged)} 个原始文件[/green]\n")
     
     # 统计
     success_count = sum(1 for r in results if r.status == 'done')

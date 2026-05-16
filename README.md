@@ -3,19 +3,33 @@
 <div align="center">
 
 ![MinerU](https://img.shields.io/badge/MinerU-Document%20Processing-blue)
-![Version](https://img.shields.io/badge/version-3.2.0-green)
+![Version](https://img.shields.io/badge/version-4.0.0-green)
 ![Python](https://img.shields.io/badge/python-3.10+-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![MCP](https://img.shields.io/badge/MCP-Model%20Context%20Protocol-purple)
 ![HTTP/3](https://img.shields.io/badge/HTTP%2F3-Supported-orange)
 
-**完整的MinerU文档处理解决方案**
+**完整的 MinerU 文档处理解决方案（v4.0.0 全面升级版）**
 
-支持 PDF/PPTX/DOCX/图片 | 真正异步并发 | 批量异步并行 | MCP自然语言交互
+精准 API + Agent 轻量 API | 全参数透传 | 智能错误重试 | 自动拆分合并 | Token 自动续期
 
 [快速开始](#-快速开始) • [功能特性](#-功能特性) • [安装](#-安装) • [使用](#-使用) • [文档](#-文档)
 
 </div>
+
+---
+
+## ✨ v4.0.0 亮点（2026-05-16）
+
+- 🚀 **覆盖官方完整能力**：精准 API（`/api/v4/`）+ Agent 轻量 API（`/api/v1/agent/`）双线
+- 🔥 **新增 6 个 MCP 工具**：`process_document` / `process_directory` / `process_document_lite` /
+  `query_task_status` / `renew_tokens` / `get_token_status`
+- 🛡️ **健壮性大幅升级**：30+ 错误码分类、智能重试、Token 自动续期、URL 服务端直传（无需下载）
+- 📐 **服务端 200 页限制适配**：自动拆分 180 页/片处理后合并；无缝处理 1000+ 页文档
+- 🐛 **修复严重 bug**：图片引用路径错位（影响所有历史输出，v4.0.0 已彻底解决）
+- 🧪 **测试覆盖**：30+ 单元测试，覆盖错误码、路径修复、文件拆分等核心逻辑
+
+详见 [`docs/CHANGELOG.md`](docs/CHANGELOG.md) 和 [`docs/API_V4_REFERENCE.md`](docs/API_V4_REFERENCE.md)。
 
 ---
 
