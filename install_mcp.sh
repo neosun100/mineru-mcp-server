@@ -38,8 +38,18 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 
 source "$PROJECT_DIR/.venv/bin/activate"
 
-echo "安装Python依赖..."
-uv pip install niquests PyPDF2 python-pptx python-docx mcp rich selenium pyyaml
+echo "安装Python依赖（必须用 uv，避免环境冲突）..."
+# 运行时依赖（来自 requirements.txt）
+uv pip install -r "$PROJECT_DIR/requirements.txt"
+
+# 安装 playwright 浏览器（batch_login.py 需要）
+"$PROJECT_DIR/.venv/bin/playwright" install chromium 2>/dev/null || true
+
+# 开发依赖（如果有 requirements-dev.txt 就装，没有就跳过）
+if [ -f "$PROJECT_DIR/requirements-dev.txt" ]; then
+    echo "安装开发依赖（pytest 等）..."
+    uv pip install -r "$PROJECT_DIR/requirements-dev.txt"
+fi
 
 echo "✅ 依赖安装完成"
 echo ""

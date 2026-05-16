@@ -160,21 +160,27 @@ python3 src/mineru_async.py ~/Documents/report.pdf
 git clone https://github.com/neosun100/mineru-mcp-server.git
 cd mineru-mcp-server
 
-# 2. 创建虚拟环境
+# 2. 创建虚拟环境（必须用 uv，避免环境冲突）
 uv venv
 source .venv/bin/activate
 
-# 3. 安装依赖
-uv pip install niquests PyPDF2 python-pptx python-docx mcp rich playwright pyyaml
-playwright install chromium
+# 3. 安装运行时依赖（必须用 uv pip）
+uv pip install -r requirements.txt
+.venv/bin/playwright install chromium
 
-# 4. 配置账户
-cp accounts.yaml.example accounts.yaml
-vi accounts.yaml
+# 4. 安装开发依赖（可选，跑测试时需要）
+uv pip install -r requirements-dev.txt
 
-# 5. 批量登录（需要图形界面环境）
-python3 batch_login.py
+# 5. 配置账户
+cp config/accounts.yaml.example config/accounts.yaml
+vi config/accounts.yaml
+
+# 6. 批量登录（默认 headless，无需图形界面）
+.venv/bin/python3 src/batch_login.py
 ```
+
+> **⚠️ 重要：所有 Python 包安装必须使用 `uv pip install`，不要用裸 `pip install`。**
+> uv 会与 `.venv/` 严格隔离并避免与系统 Python 环境的冲突。
 
 ### MCP服务器配置
 

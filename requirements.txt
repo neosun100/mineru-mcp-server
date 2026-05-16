@@ -1,3 +1,10 @@
+# MinerU MCP Server — 运行时依赖
+#
+# ⚠️ 必须用 uv 安装，避免环境冲突：
+#   uv pip install -r requirements.txt
+#
+# 不要用裸 pip！开发依赖见 requirements-dev.txt。
+
 niquests>=3.10.0
 PyPDF2>=3.0.0
 python-pptx>=1.0.0
