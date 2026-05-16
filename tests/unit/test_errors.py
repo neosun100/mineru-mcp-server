@@ -6,6 +6,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 
 import api_errors as E
 
+import pytest
+
+pytestmark = pytest.mark.unit
+
+
 
 def test_classify_known_codes():
     assert E.classify("-60006").category is E.ErrorCategory.PERMANENT

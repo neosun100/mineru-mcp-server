@@ -7,6 +7,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 import split_large_file as SL
 import auto_split as AS
 
+import pytest
+
+pytestmark = pytest.mark.unit
+
+
 
 def test_constants_match_server_limits():
     assert SL.SERVER_MAX_PAGES == 200

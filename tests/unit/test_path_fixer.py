@@ -6,6 +6,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 
 import path_fixer as PF
 
+import pytest
+
+pytestmark = pytest.mark.unit
+
+
 
 def test_rewrite_basic():
     md = "# 标题\n\n![](images/abc.jpg)\n"
