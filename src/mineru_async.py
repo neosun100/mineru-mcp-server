@@ -674,7 +674,9 @@ class MinerUAsyncProcessor:
                 await _progress(9, 10, "下载并解压结果...")
                 
                 output_path = Path(output_dir)
-                if not file_info['is_url']:
+                # 默认 ./output 时，本地文件改用其同目录（保持向后兼容）；
+                # 但用户显式传了非默认 output_dir 时，必须尊重用户的选择。
+                if not file_info['is_url'] and output_dir == "./output":
                     output_path = Path(file_path).parent
                 
                 output_path.mkdir(exist_ok=True, parents=True)

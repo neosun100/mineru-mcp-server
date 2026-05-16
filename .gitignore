@@ -32,6 +32,7 @@ test_*.py
 !tests/unit/test_*.py
 !tests/integration/test_*.py
 !tests/e2e/test_*.py
+!tests/regression/test_*.py
 
 # 其他敏感信息
 *.key
