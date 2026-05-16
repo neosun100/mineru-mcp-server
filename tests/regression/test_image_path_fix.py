@@ -97,17 +97,16 @@ def test_path_fixer_does_not_break_remote_images():
 
 
 def test_real_world_5_pdf_outputs_have_no_broken_refs(sample_pdfs_dir):
-    """如果 ~/Downloads/sample_pdfs 处理产物存在，验证 .md 中所有图片引用都能找到文件。
+    """如果设置了 MINERU_SAMPLE_PDFS_DIR 且目录里有 .md 产物，验证图片引用都能找到文件。
 
-    这是 v4.0.0 端到端跑过的真实数据；如果某天这些文件被破坏，
-    本测试会立刻警报。
+    这是 v4.0.0 端到端跑过的真实数据；如果某天产物被破坏，本测试会立刻警报。
     """
     if sample_pdfs_dir is None:
-        pytest.skip("~/Downloads/sample_pdfs 不存在，跳过（仅在有产物时运行）")
+        pytest.skip("未设置 MINERU_SAMPLE_PDFS_DIR，跳过（仅在有产物时运行）")
 
     md_files = list(sample_pdfs_dir.glob("*.md"))
     if not md_files:
-        pytest.skip("没有 .md 产物")
+        pytest.skip("样本目录没有 .md 产物")
 
     total_refs = 0
     total_missing = 0
@@ -118,4 +117,4 @@ def test_real_world_5_pdf_outputs_have_no_broken_refs(sample_pdfs_dir):
         assert len(missing) == 0, \
             f"{md.name} 有 {len(missing)} 个图片引用缺失：{missing[:3]}"
 
-    print(f"\n  ✅ 5 PDF 产物：{total_refs} 个图片引用全部存在")
+    print(f"\n  ✅ {len(md_files)} 个 .md 产物：{total_refs} 个图片引用全部存在")

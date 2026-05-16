@@ -47,7 +47,7 @@ RUN_E2E=1 .venv/bin/python3 -m pytest
 
 E2E 测试在以下情况会自动 skip：
 - `all_tokens.json` 不存在或全部过期
-- `~/Downloads/sample_pdfs/PDF-A..pdf` 不存在
+- 未设置 `MINERU_SAMPLE_PDFS_DIR` 或目录无 PDF
 - 默认运行（即没设 `RUN_E2E=1` 也没用 `-m e2e`）
 
 ## 添加新测试
@@ -64,7 +64,7 @@ E2E 测试在以下情况会自动 skip：
 | Fixture | 作用 |
 |---|---|
 | `project_root` | 项目根目录的 `Path` |
-| `sample_pdfs_dir` | `~/Downloads/sample_pdfs/`（不存在时返回 `None`） |
+| `sample_pdfs_dir` | `MINERU_SAMPLE_PDFS_DIR` 环境变量指向的 PDF 目录（不存在时返回 `None`） |
 | `make_pdf` | `make_pdf(name, n_pages)` 在 tmp_path 造一个 N 页空白 PDF |
 
 ## 当前测试统计

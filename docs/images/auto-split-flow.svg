@@ -12,7 +12,7 @@
   <rect width="1000" height="700" rx="14" fill="#0f172a"/>
 
   <text x="500" y="38" font-size="22" font-weight="700" fill="#fbbf24" text-anchor="middle">超页 PDF 自动拆分协调流程</text>
-  <text x="500" y="60" font-size="12" fill="#94a3b8" text-anchor="middle">真实案例 · 《PDF-E》496 页 → 3 片 · 全自动拆分 · 并发处理 · 智能合并</text>
+  <text x="500" y="60" font-size="12" fill="#94a3b8" text-anchor="middle">真实案例 · 496 页 PDF → 3 片 · 全自动拆分 · 并发处理 · 智能合并</text>
 
   <!-- 原始 PDF -->
   <rect x="50" y="92" width="200" height="80" rx="10" fill="#1e293b" stroke="#fbbf24" stroke-width="2"/>
@@ -100,7 +100,7 @@
 
   <!-- 最终产物 -->
   <rect x="200" y="592" width="600" height="80" rx="10" fill="#1e293b" stroke="#43e97b" stroke-width="2"/>
-  <text x="500" y="613" font-size="14" font-weight="700" fill="#86efac" text-anchor="middle">📗 PDF-E-带目录.md</text>
+  <text x="500" y="613" font-size="14" font-weight="700" fill="#86efac" text-anchor="middle">📗 PDF-E.md</text>
   <text x="500" y="633" font-size="11" fill="#cbd5e1" text-anchor="middle">209,955 字符 · 3 片标记齐全 · 图片引用 0 缺失</text>
   <text x="500" y="649" font-size="10" fill="#94a3b8" text-anchor="middle">合并完成 · 用户视角：单文件输入 → 单文件输出 · 拆分协调 100% 透明</text>
   <text x="500" y="664" font-size="10" fill="#fbbf24" text-anchor="middle">总耗时 ~3 分钟（含拆分+并发处理+合并）</text>

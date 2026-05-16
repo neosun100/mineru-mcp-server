@@ -42,19 +42,19 @@ def test_rewrite_idempotent_when_already_prefixed():
 def test_part_prefix_form_1():
     """形式 1: ![](images/x) → ![](final/partN_x)"""
     md = "![](images/abc.jpg)"
-    out = PF.rewrite_md_with_part_prefix(md, "千门_images", part_index=1)
-    assert "千门_images/part1_abc.jpg" in out
+    out = PF.rewrite_md_with_part_prefix(md, "doc_images", part_index=1)
+    assert "doc_images/part1_abc.jpg" in out
 
 
 def test_part_prefix_form_2():
     """形式 2: ![](chunk_images/x) → ![](final/partN_x)"""
-    md = "![](千门_part1of3_images/abc.jpg)"
+    md = "![](doc_part1of3_images/abc.jpg)"
     out = PF.rewrite_md_with_part_prefix(
-        md, "千门_images", part_index=1,
-        chunk_dir_name="千门_part1of3_images",
+        md, "doc_images", part_index=1,
+        chunk_dir_name="doc_part1of3_images",
     )
-    assert "千门_images/part1_abc.jpg" in out
-    assert "千门_part1of3_images" not in out
+    assert "doc_images/part1_abc.jpg" in out
+    assert "doc_part1of3_images" not in out
 
 
 def test_part_prefix_does_not_affect_other_parts():

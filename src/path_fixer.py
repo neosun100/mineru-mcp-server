@@ -54,9 +54,9 @@ def rewrite_md_with_part_prefix(
 
     Args:
         md_text:         chunk 的 .md 原始文本
-        final_dir_name:  合并后的统一图片目录名（如 ``PDF-E_images``）
+        final_dir_name:  合并后的统一图片目录名（如 ``report_images``）
         part_index:      该 chunk 是第几片（1-based）
-        chunk_dir_name:  该 chunk 自身的图片目录名（如 ``PDF-E_part1of3_images``），
+        chunk_dir_name:  该 chunk 自身的图片目录名（如 ``report_part1of3_images``），
                          可省略；省略时只处理形式 1。
     """
     if not md_text:

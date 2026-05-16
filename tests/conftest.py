@@ -46,9 +46,28 @@ def project_root() -> Path:
 
 @pytest.fixture(scope="session")
 def sample_pdfs_dir() -> Path | None:
-    """sample_pdfs 5 个 PDF 的目录（如果存在）。给 e2e 用。"""
-    p = Path.home() / "Downloads" / "sample_pdfs"
+    """供 e2e 使用的 PDF 样本目录。
+
+    通过环境变量 ``MINERU_SAMPLE_PDFS_DIR`` 指定（绝对路径）。
+    未设置或目录不存在时返回 ``None``，e2e 测试会自动 skip。
+
+    示例：
+        export MINERU_SAMPLE_PDFS_DIR=/path/to/your/pdf/samples
+    """
+    env_path = os.environ.get("MINERU_SAMPLE_PDFS_DIR")
+    if not env_path:
+        return None
+    p = Path(env_path).expanduser()
     return p if p.exists() else None
+
+
+@pytest.fixture(scope="session")
+def sample_pdf(sample_pdfs_dir) -> Path | None:
+    """从 sample_pdfs_dir 中挑一个最小的 PDF 给 e2e 用。"""
+    if sample_pdfs_dir is None:
+        return None
+    pdfs = sorted(sample_pdfs_dir.glob("*.pdf"), key=lambda p: p.stat().st_size)
+    return pdfs[0] if pdfs else None
 
 
 @pytest.fixture

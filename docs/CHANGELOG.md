@@ -93,7 +93,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `docs/images/` — 4 张架构/流程图（已托管到 `img.aws.xin` CDN）
   - `architecture.png` — 5 层 / 10 模块架构
   - `processing-flow.png` — 文档处理完整流程
-  - `auto-split-flow.png` — 自动拆分协调流程（PDF-E 496 页 → 3 片 实战示例）
+  - `auto-split-flow.png` — 自动拆分协调流程（496 页 PDF → 3 片 实战示例）
   - `mcp-tools-decision.png` — 6 个 MCP 工具决策树
 
 ### 🔧 工程优化
@@ -105,7 +105,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   全局 `test_*.py` 忽略导致测试文件未入版本控制）
 - **`pytest.ini`**：注册 4 个 markers + asyncio mode auto + testpaths 精确指定
 
-### 📊 真实数据验证（5 本古籍 1229 页 OCR 全量）
+### 📊 真实数据验证（5 个文档 1229 页 OCR 全量）
 
 | 文件 | 页数 | 处理方式 | MD 字符 | 图片 | 缺失 |
 |---|---:|---|---:|---:|---:|
@@ -133,7 +133,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ```
 a8fbe7f docs: 重写 README + 完善 CHANGELOG + 4 张架构流程图（CDN 托管）
-2bcbe1c fix: 修 output_dir 被本地文件强制忽略 + 重跑PDF-A
+2bcbe1c fix: 修 output_dir 被本地文件强制忽略 + 重跑测试样本
 104c73e test: 建立完整三层测试体系（unit + integration + regression + e2e）
 f703ebc fix: 安装强制使用 uv pip 避免环境冲突
 08c513b feat(v4.0.0): 全面升级 - 覆盖 MinerU 官方完整 API + 健壮性大幅提升
