@@ -1,0 +1,112 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 760">
+  <style>text{font-family:'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;dominant-baseline:middle}</style>
+  <defs>
+    <linearGradient id="title" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#4facfe"/><stop offset="100%" style="stop-color:#00f2fe"/>
+    </linearGradient>
+    <marker id="arr" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <polygon points="0 0, 10 5, 0 10" fill="#94a3b8"/>
+    </marker>
+    <marker id="arr_g" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <polygon points="0 0, 10 5, 0 10" fill="#43e97b"/>
+    </marker>
+    <marker id="arr_o" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <polygon points="0 0, 10 5, 0 10" fill="#fbbf24"/>
+    </marker>
+  </defs>
+
+  <rect width="1000" height="760" rx="14" fill="#0f172a"/>
+
+  <text x="500" y="40" font-size="22" font-weight="700" fill="#7dd3fc" text-anchor="middle">文档处理完整流程  ·  从 PDF/URL 到 Markdown</text>
+  <text x="500" y="62" font-size="12" fill="#94a3b8" text-anchor="middle">v4.0.0 · 含自动拆分 · 服务端直传 · 错误重试 · 路径修复 · 结果合并</text>
+
+  <!-- 输入层 -->
+  <rect x="40" y="92" width="920" height="60" rx="8" fill="#1e293b" stroke="#7dd3fc" stroke-width="2"/>
+  <text x="60" y="113" font-size="13" font-weight="700" fill="#7dd3fc">📥 输入</text>
+  <rect x="120" y="103" width="160" height="38" rx="6" fill="#0f172a" stroke="#4facfe"/>
+  <text x="200" y="122" font-size="11" fill="#e2e8f0" text-anchor="middle">本地 PDF/DOC/PPT</text>
+  <rect x="295" y="103" width="160" height="38" rx="6" fill="#0f172a" stroke="#4facfe"/>
+  <text x="375" y="122" font-size="11" fill="#e2e8f0" text-anchor="middle">远程 URL</text>
+  <rect x="470" y="103" width="160" height="38" rx="6" fill="#0f172a" stroke="#4facfe"/>
+  <text x="550" y="122" font-size="11" fill="#e2e8f0" text-anchor="middle">图片 (PNG/JPG)</text>
+  <rect x="645" y="103" width="160" height="38" rx="6" fill="#0f172a" stroke="#4facfe"/>
+  <text x="725" y="122" font-size="11" fill="#e2e8f0" text-anchor="middle">网页 HTML</text>
+  <rect x="820" y="103" width="120" height="38" rx="6" fill="#0f172a" stroke="#4facfe"/>
+  <text x="880" y="122" font-size="11" fill="#e2e8f0" text-anchor="middle">目录批量</text>
+
+  <!-- Step 1: 验证 -->
+  <line x1="500" y1="152" x2="500" y2="170" stroke="#94a3b8" stroke-width="2" marker-end="url(#arr)"/>
+  <rect x="320" y="170" width="360" height="58" rx="8" fill="#1e293b" stroke="#fbbf24" stroke-width="2"/>
+  <text x="500" y="190" font-size="13" font-weight="700" fill="#fbbf24" text-anchor="middle">① 文件验证 · FileValidator</text>
+  <text x="500" y="210" font-size="11" fill="#cbd5e1" text-anchor="middle">大小 ≤200MB · 页数检测 · 格式白名单 · 自动模型选择</text>
+
+  <!-- Step 2: 拆分判断（菱形） -->
+  <line x1="500" y1="228" x2="500" y2="246" stroke="#94a3b8" stroke-width="2" marker-end="url(#arr)"/>
+  <polygon points="500,250 600,300 500,350 400,300" fill="#1e293b" stroke="#fa709a" stroke-width="2"/>
+  <text x="500" y="294" font-size="13" font-weight="700" fill="#fda4af" text-anchor="middle">② 是否超规格？</text>
+  <text x="500" y="312" font-size="10" fill="#94a3b8" text-anchor="middle">>200页 或 &gt;200MB</text>
+
+  <!-- 是 → auto_split -->
+  <line x1="600" y1="300" x2="660" y2="300" stroke="#fbbf24" stroke-width="2" marker-end="url(#arr_o)"/>
+  <text x="630" y="290" font-size="11" font-weight="700" fill="#fbbf24">是</text>
+
+  <rect x="660" y="270" width="280" height="60" rx="8" fill="#1e293b" stroke="#fbbf24" stroke-width="2"/>
+  <text x="800" y="290" font-size="13" font-weight="700" fill="#fbbf24" text-anchor="middle">🔪 auto_split.prepare_files</text>
+  <text x="800" y="310" font-size="10" fill="#cbd5e1" text-anchor="middle">物理拆分为 ≤180 页/片的 chunks</text>
+  <text x="800" y="324" font-size="9" fill="#94a3b8" text-anchor="middle">496 页 → 3 片 · 309 页 → 2 片</text>
+
+  <!-- 否：直接处理（向左） -->
+  <line x1="400" y1="300" x2="340" y2="300" stroke="#43e97b" stroke-width="2" marker-end="url(#arr_g)"/>
+  <text x="370" y="290" font-size="11" font-weight="700" fill="#43e97b">否</text>
+
+  <!-- Step 3: 上传/提交 -->
+  <line x1="500" y1="350" x2="500" y2="380" stroke="#94a3b8" stroke-width="2" marker-end="url(#arr)"/>
+
+  <rect x="80" y="380" width="380" height="120" rx="8" fill="#1e293b" stroke="#43e97b" stroke-width="2"/>
+  <text x="270" y="400" font-size="13" font-weight="700" fill="#86efac" text-anchor="middle">③ 提交到 MinerU 服务端</text>
+  <rect x="100" y="412" width="160" height="32" rx="5" fill="#0f172a" stroke="#43e97b"/>
+  <text x="180" y="429" font-size="10" fill="#86efac" text-anchor="middle" font-weight="600">URL 优先直传</text>
+  <text x="180" y="441" font-size="8" fill="#94a3b8" text-anchor="middle">v4 /extract/task</text>
+  <rect x="280" y="412" width="160" height="32" rx="5" fill="#0f172a" stroke="#43e97b"/>
+  <text x="360" y="429" font-size="10" fill="#86efac" text-anchor="middle" font-weight="600">本地文件签名上传</text>
+  <text x="360" y="441" font-size="8" fill="#94a3b8" text-anchor="middle">v4 /file-urls/batch + PUT</text>
+  <text x="270" y="464" font-size="10" fill="#cbd5e1" text-anchor="middle">参数透传：language, is_ocr, page_ranges, extra_formats, data_id</text>
+  <text x="270" y="482" font-size="10" fill="#cbd5e1" text-anchor="middle">Token：TokenManager.pick(least_used) 多账号负载均衡</text>
+
+  <rect x="540" y="380" width="380" height="120" rx="8" fill="#1e293b" stroke="#fa709a" stroke-width="2"/>
+  <text x="730" y="400" font-size="13" font-weight="700" fill="#fda4af" text-anchor="middle">④ 错误处理 · api_errors.py</text>
+  <rect x="560" y="412" width="170" height="32" rx="5" fill="#0f172a" stroke="#fa709a"/>
+  <text x="645" y="429" font-size="10" fill="#fda4af" text-anchor="middle" font-weight="600">RETRYABLE</text>
+  <text x="645" y="441" font-size="8" fill="#94a3b8" text-anchor="middle">-10001/-60008/-60009 自动重试</text>
+  <rect x="740" y="412" width="170" height="32" rx="5" fill="#0f172a" stroke="#fa709a"/>
+  <text x="825" y="429" font-size="10" fill="#fda4af" text-anchor="middle" font-weight="600">AUTH</text>
+  <text x="825" y="441" font-size="8" fill="#94a3b8" text-anchor="middle">A0211 触发自动续期</text>
+  <rect x="560" y="452" width="170" height="32" rx="5" fill="#0f172a" stroke="#fa709a"/>
+  <text x="645" y="469" font-size="10" fill="#fda4af" text-anchor="middle" font-weight="600">QUOTA</text>
+  <text x="645" y="481" font-size="8" fill="#94a3b8" text-anchor="middle">-60018 切换账号或轻量 API</text>
+  <rect x="740" y="452" width="170" height="32" rx="5" fill="#0f172a" stroke="#fa709a"/>
+  <text x="825" y="469" font-size="10" fill="#fda4af" text-anchor="middle" font-weight="600">PERMANENT</text>
+  <text x="825" y="481" font-size="8" fill="#94a3b8" text-anchor="middle">-60005/-60006 中文友好提示</text>
+
+  <!-- Step 5: 轮询 -->
+  <line x1="270" y1="500" x2="270" y2="528" stroke="#94a3b8" stroke-width="2" marker-end="url(#arr)"/>
+  <line x1="730" y1="500" x2="730" y2="528" stroke="#94a3b8" stroke-width="2" marker-end="url(#arr)"/>
+
+  <rect x="80" y="528" width="840" height="58" rx="8" fill="#1e293b" stroke="#a78bfa" stroke-width="2"/>
+  <text x="500" y="548" font-size="13" font-weight="700" fill="#c4b5fd" text-anchor="middle">⑤ 异步轮询任务进度  ·  wait_for_completion / wait_for_single_task</text>
+  <text x="500" y="568" font-size="11" fill="#cbd5e1" text-anchor="middle">每 2s 查询 state · running 时上报 extracted_pages/total_pages · 用 niquests AsyncSession 真异步</text>
+
+  <!-- Step 6: 下载 -->
+  <line x1="500" y1="586" x2="500" y2="606" stroke="#94a3b8" stroke-width="2" marker-end="url(#arr)"/>
+  <rect x="80" y="606" width="840" height="58" rx="8" fill="#1e293b" stroke="#43e97b" stroke-width="2"/>
+  <text x="500" y="626" font-size="13" font-weight="700" fill="#86efac" text-anchor="middle">⑥ 下载 ZIP · 解压 · 复制 .md · 复制 _images · path_fixer 重写图片引用</text>
+  <text x="500" y="646" font-size="10" fill="#cbd5e1" text-anchor="middle">images/x.jpg → {stem}_images/x.jpg  (修复 v3.x 严重 bug · 593 张图片缺失 0)</text>
+
+  <!-- Step 7: 合并 chunks -->
+  <line x1="800" y1="664" x2="800" y2="682" stroke="#fbbf24" stroke-width="2" marker-end="url(#arr_o)"/>
+  <text x="820" y="675" font-size="9" fill="#fbbf24">仅当拆分时</text>
+
+  <rect x="80" y="682" width="840" height="58" rx="8" fill="#1e293b" stroke="#fbbf24" stroke-width="2"/>
+  <text x="500" y="702" font-size="13" font-weight="700" fill="#fbbf24" text-anchor="middle">⑦ auto_split.merge_results  ·  合并 chunks 为完整 .md</text>
+  <text x="500" y="722" font-size="10" fill="#cbd5e1" text-anchor="middle">part1.md + part2.md + ... → 单个 .md  ·  图片加 partN_ 前缀放统一目录  ·  插入 Part N/M HTML 注释</text>
+</svg>

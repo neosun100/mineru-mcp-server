@@ -1,0 +1,149 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 720">
+  <style>text{font-family:'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;dominant-baseline:middle}</style>
+  <defs>
+    <linearGradient id="g_mcp" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#a18cd1"/><stop offset="100%" style="stop-color:#fbc2eb"/>
+    </linearGradient>
+    <linearGradient id="g_core" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#4facfe"/><stop offset="100%" style="stop-color:#00f2fe"/>
+    </linearGradient>
+    <linearGradient id="g_client" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#43e97b"/><stop offset="100%" style="stop-color:#38f9d7"/>
+    </linearGradient>
+    <linearGradient id="g_infra" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#fa709a"/><stop offset="100%" style="stop-color:#fee140"/>
+    </linearGradient>
+    <linearGradient id="g_extern" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#667eea"/><stop offset="100%" style="stop-color:#764ba2"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 背景 -->
+  <rect width="1000" height="720" rx="14" fill="#0f172a"/>
+
+  <!-- 标题 -->
+  <text x="500" y="40" font-size="22" font-weight="700" fill="#e2e8f0" text-anchor="middle">mineru-mcp-server v4.0.0 — 架构层次</text>
+  <text x="500" y="65" font-size="13" fill="#94a3b8" text-anchor="middle">5 层 / 10 模块 / 6 个 MCP 工具 / 双 API 客户端</text>
+
+  <!-- ========================== Layer 1: MCP 接入层 ========================== -->
+  <rect x="40" y="92" width="920" height="92" rx="10" fill="#1e293b" stroke="url(#g_mcp)" stroke-width="2"/>
+  <text x="60" y="115" font-size="14" font-weight="700" fill="#c4b5fd">① MCP 接入层  ·  src/mineru_mcp_server.py</text>
+
+  <g font-size="11" fill="#e2e8f0">
+    <rect x="60" y="130" width="170" height="42" rx="6" fill="#0f172a" stroke="#a18cd1"/>
+    <text x="145" y="144" text-anchor="middle" font-weight="600" fill="#c4b5fd">process_document</text>
+    <text x="145" y="160" text-anchor="middle" fill="#94a3b8" font-size="9">精准 API 单文件 · 11 参数</text>
+
+    <rect x="240" y="130" width="170" height="42" rx="6" fill="#0f172a" stroke="#a18cd1"/>
+    <text x="325" y="144" text-anchor="middle" font-weight="600" fill="#c4b5fd">process_directory</text>
+    <text x="325" y="160" text-anchor="middle" fill="#94a3b8" font-size="9">精准 API 批量并行 · 10 参数</text>
+
+    <rect x="420" y="130" width="170" height="42" rx="6" fill="#0f172a" stroke="#a18cd1"/>
+    <text x="505" y="144" text-anchor="middle" font-weight="600" fill="#c4b5fd">process_document_lite</text>
+    <text x="505" y="160" text-anchor="middle" fill="#94a3b8" font-size="9">轻量 API · 免 Token · ≤10MB/20页</text>
+
+    <rect x="600" y="130" width="170" height="42" rx="6" fill="#0f172a" stroke="#a18cd1"/>
+    <text x="685" y="144" text-anchor="middle" font-weight="600" fill="#c4b5fd">query_task_status</text>
+    <text x="685" y="160" text-anchor="middle" fill="#94a3b8" font-size="9">异步轮询任务进度</text>
+
+    <rect x="780" y="130" width="170" height="42" rx="6" fill="#0f172a" stroke="#a18cd1"/>
+    <text x="865" y="144" text-anchor="middle" font-weight="600" fill="#c4b5fd">renew_tokens / status</text>
+    <text x="865" y="160" text-anchor="middle" fill="#94a3b8" font-size="9">Token 自动续期 + 状态报告</text>
+  </g>
+
+  <!-- 箭头到 Layer 2 -->
+  <path d="M 500 184 L 500 200" stroke="#94a3b8" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+
+  <!-- ========================== Layer 2: 协调层 ========================== -->
+  <rect x="40" y="200" width="920" height="92" rx="10" fill="#1e293b" stroke="url(#g_core)" stroke-width="2"/>
+  <text x="60" y="223" font-size="14" font-weight="700" fill="#7dd3fc">② 协调编排层  ·  无网调度逻辑，调度文件 → 拆分 → 处理 → 合并</text>
+
+  <g font-size="11" fill="#e2e8f0">
+    <rect x="60" y="240" width="240" height="42" rx="6" fill="#0f172a" stroke="#4facfe"/>
+    <text x="180" y="254" text-anchor="middle" font-weight="600" fill="#7dd3fc">auto_split.py</text>
+    <text x="180" y="270" text-anchor="middle" fill="#94a3b8" font-size="9">prepare_files() / merge_results()</text>
+
+    <rect x="320" y="240" width="240" height="42" rx="6" fill="#0f172a" stroke="#4facfe"/>
+    <text x="440" y="254" text-anchor="middle" font-weight="600" fill="#7dd3fc">mineru_batch_async.py</text>
+    <text x="440" y="270" text-anchor="middle" fill="#94a3b8" font-size="9">BatchAsyncProcessor · 并发=3 · options 透传</text>
+
+    <rect x="580" y="240" width="240" height="42" rx="6" fill="#0f172a" stroke="#4facfe"/>
+    <text x="700" y="254" text-anchor="middle" font-weight="600" fill="#7dd3fc">mineru_async.py</text>
+    <text x="700" y="270" text-anchor="middle" fill="#94a3b8" font-size="9">MinerUAsyncProcessor · 单文件流</text>
+
+    <rect x="840" y="240" width="110" height="42" rx="6" fill="#0f172a" stroke="#4facfe"/>
+    <text x="895" y="254" text-anchor="middle" font-weight="600" fill="#7dd3fc">progress.py</text>
+    <text x="895" y="270" text-anchor="middle" fill="#94a3b8" font-size="9">进度回调</text>
+  </g>
+
+  <path d="M 500 292 L 500 308" stroke="#94a3b8" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+
+  <!-- ========================== Layer 3: 客户端层 ========================== -->
+  <rect x="40" y="308" width="920" height="92" rx="10" fill="#1e293b" stroke="url(#g_client)" stroke-width="2"/>
+  <text x="60" y="331" font-size="14" font-weight="700" fill="#86efac">③ API 客户端层  ·  调 MinerU 服务端</text>
+
+  <g font-size="11" fill="#e2e8f0">
+    <rect x="60" y="348" width="430" height="42" rx="6" fill="#0f172a" stroke="#43e97b"/>
+    <text x="275" y="362" text-anchor="middle" font-weight="600" fill="#86efac">MinerUAsyncClient (mineru_async.py)</text>
+    <text x="275" y="378" text-anchor="middle" fill="#94a3b8" font-size="9">submit_url_task / upload_file / wait_for_completion · 精准 API /api/v4/</text>
+
+    <rect x="510" y="348" width="430" height="42" rx="6" fill="#0f172a" stroke="#43e97b"/>
+    <text x="725" y="362" text-anchor="middle" font-weight="600" fill="#86efac">AgentAPIClient (agent_api.py)</text>
+    <text x="725" y="378" text-anchor="middle" fill="#94a3b8" font-size="9">parse_url / parse_file · Agent 轻量 API /api/v1/agent/</text>
+  </g>
+
+  <path d="M 500 400 L 500 416" stroke="#94a3b8" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+
+  <!-- ========================== Layer 4: 基础设施 ========================== -->
+  <rect x="40" y="416" width="920" height="92" rx="10" fill="#1e293b" stroke="url(#g_infra)" stroke-width="2"/>
+  <text x="60" y="439" font-size="14" font-weight="700" fill="#fda4af">④ 基础设施层  ·  错误处理 / Token 管理 / 工具函数</text>
+
+  <g font-size="11" fill="#e2e8f0">
+    <rect x="60" y="456" width="220" height="42" rx="6" fill="#0f172a" stroke="#fa709a"/>
+    <text x="170" y="470" text-anchor="middle" font-weight="600" fill="#fda4af">api_errors.py</text>
+    <text x="170" y="486" text-anchor="middle" fill="#94a3b8" font-size="9">30+ 错误码 · 4 类分类</text>
+
+    <rect x="290" y="456" width="220" height="42" rx="6" fill="#0f172a" stroke="#fa709a"/>
+    <text x="400" y="470" text-anchor="middle" font-weight="600" fill="#fda4af">token_manager.py</text>
+    <text x="400" y="486" text-anchor="middle" fill="#94a3b8" font-size="9">单例 · 负载均衡 · 自动续期</text>
+
+    <rect x="520" y="456" width="220" height="42" rx="6" fill="#0f172a" stroke="#fa709a"/>
+    <text x="630" y="470" text-anchor="middle" font-weight="600" fill="#fda4af">path_fixer.py</text>
+    <text x="630" y="486" text-anchor="middle" fill="#94a3b8" font-size="9">Markdown 图片路径重写</text>
+
+    <rect x="750" y="456" width="200" height="42" rx="6" fill="#0f172a" stroke="#fa709a"/>
+    <text x="850" y="470" text-anchor="middle" font-weight="600" fill="#fda4af">split_large_file.py</text>
+    <text x="850" y="486" text-anchor="middle" fill="#94a3b8" font-size="9">PDF 物理拆分</text>
+  </g>
+
+  <path d="M 500 508 L 500 524" stroke="#94a3b8" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+
+  <!-- ========================== Layer 5: 外部 ========================== -->
+  <rect x="40" y="524" width="920" height="92" rx="10" fill="#1e293b" stroke="url(#g_extern)" stroke-width="2"/>
+  <text x="60" y="547" font-size="14" font-weight="700" fill="#c4b5fd">⑤ 外部依赖  ·  MinerU 服务端 / 本地登录 / Token 文件</text>
+
+  <g font-size="11" fill="#e2e8f0">
+    <rect x="60" y="564" width="280" height="42" rx="6" fill="#0f172a" stroke="#667eea"/>
+    <text x="200" y="578" text-anchor="middle" font-weight="600" fill="#a78bfa">MinerU 服务端</text>
+    <text x="200" y="594" text-anchor="middle" fill="#94a3b8" font-size="9">mineru.net · ≤200页 ≤200MB · vlm/pipeline/MinerU-HTML</text>
+
+    <rect x="350" y="564" width="280" height="42" rx="6" fill="#0f172a" stroke="#667eea"/>
+    <text x="490" y="578" text-anchor="middle" font-weight="600" fill="#a78bfa">batch_login.py · headless</text>
+    <text x="490" y="594" text-anchor="middle" fill="#94a3b8" font-size="9">Playwright 自动登录 · 阿里云验证码 · 90天有效期</text>
+
+    <rect x="640" y="564" width="310" height="42" rx="6" fill="#0f172a" stroke="#667eea"/>
+    <text x="795" y="578" text-anchor="middle" font-weight="600" fill="#a78bfa">all_tokens.json · 6 账号</text>
+    <text x="795" y="594" text-anchor="middle" fill="#94a3b8" font-size="9">每账号 1000 页/天高优先级 · 总配额 6000 页/天</text>
+  </g>
+
+  <!-- 底部统计 -->
+  <text x="500" y="650" font-size="13" font-weight="600" fill="#86efac" text-anchor="middle">v4.0.0 · 84 个测试 (unit 30 / integration 31 / regression 21 / e2e 2) · 100% 通过</text>
+  <text x="500" y="675" font-size="11" fill="#94a3b8" text-anchor="middle">每月可处理 6000 × 30 = 180,000 页文档 · 自动拆分 1000+ 页大文件 · 全异步并发 10× 加速</text>
+  <text x="500" y="700" font-size="10" fill="#64748b" text-anchor="middle">github.com/neosun100/mineru-mcp-server</text>
+
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <polygon points="0 0, 10 5, 0 10" fill="#94a3b8"/>
+    </marker>
+  </defs>
+</svg>

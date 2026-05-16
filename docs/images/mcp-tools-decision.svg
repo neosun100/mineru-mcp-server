@@ -1,0 +1,148 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 720">
+  <style>text{font-family:'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;dominant-baseline:middle}</style>
+  <defs>
+    <marker id="ar" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <polygon points="0 0, 10 5, 0 10" fill="#94a3b8"/>
+    </marker>
+  </defs>
+
+  <rect width="1100" height="720" rx="14" fill="#0f172a"/>
+
+  <text x="550" y="40" font-size="22" font-weight="700" fill="#c4b5fd" text-anchor="middle">6 个 MCP 工具 · 决策树</text>
+  <text x="550" y="62" font-size="12" fill="#94a3b8" text-anchor="middle">3 个处理工具 + 1 个查询 + 2 个 Token 管理 · 自动选择最佳路径</text>
+
+  <!-- 起点：用户意图 -->
+  <rect x="430" y="92" width="240" height="60" rx="10" fill="#1e293b" stroke="#fbbf24" stroke-width="2"/>
+  <text x="550" y="112" font-size="14" font-weight="700" fill="#fbbf24" text-anchor="middle">用户意图</text>
+  <text x="550" y="132" font-size="11" fill="#cbd5e1" text-anchor="middle">"帮我处理这个 PDF" · "查 Token" · "续期"</text>
+
+  <!-- 主分叉 -->
+  <line x1="550" y1="152" x2="550" y2="174" stroke="#94a3b8" stroke-width="2"/>
+  <line x1="200" y1="174" x2="900" y2="174" stroke="#94a3b8" stroke-width="2"/>
+  <line x1="200" y1="174" x2="200" y2="194" stroke="#94a3b8" stroke-width="2" marker-end="url(#ar)"/>
+  <line x1="550" y1="174" x2="550" y2="194" stroke="#94a3b8" stroke-width="2" marker-end="url(#ar)"/>
+  <line x1="900" y1="174" x2="900" y2="194" stroke="#94a3b8" stroke-width="2" marker-end="url(#ar)"/>
+
+  <!-- 三大分类 -->
+  <rect x="50" y="194" width="300" height="44" rx="8" fill="#1e293b" stroke="#43e97b" stroke-width="2"/>
+  <text x="200" y="218" font-size="13" font-weight="700" fill="#86efac" text-anchor="middle">📄 处理文档</text>
+
+  <rect x="450" y="194" width="200" height="44" rx="8" fill="#1e293b" stroke="#7dd3fc" stroke-width="2"/>
+  <text x="550" y="218" font-size="13" font-weight="700" fill="#7dd3fc" text-anchor="middle">🔍 查询状态</text>
+
+  <rect x="750" y="194" width="300" height="44" rx="8" fill="#1e293b" stroke="#fda4af" stroke-width="2"/>
+  <text x="900" y="218" font-size="13" font-weight="700" fill="#fda4af" text-anchor="middle">🔐 Token 管理</text>
+
+  <!-- ============ 处理文档子树 ============ -->
+  <line x1="200" y1="238" x2="200" y2="260" stroke="#94a3b8" stroke-width="2"/>
+  <line x1="80" y1="260" x2="320" y2="260" stroke="#94a3b8" stroke-width="2"/>
+
+  <line x1="80" y1="260" x2="80" y2="280" stroke="#94a3b8" stroke-width="2" marker-end="url(#ar)"/>
+  <line x1="200" y1="260" x2="200" y2="280" stroke="#94a3b8" stroke-width="2" marker-end="url(#ar)"/>
+  <line x1="320" y1="260" x2="320" y2="280" stroke="#94a3b8" stroke-width="2" marker-end="url(#ar)"/>
+
+  <!-- 三个子标签 -->
+  <rect x="20" y="280" width="120" height="34" rx="6" fill="#1e293b" stroke="#94a3b8"/>
+  <text x="80" y="298" font-size="10" fill="#cbd5e1" text-anchor="middle">单文件 / URL</text>
+
+  <rect x="145" y="280" width="110" height="34" rx="6" fill="#1e293b" stroke="#43e97b" stroke-width="1.5"/>
+  <text x="200" y="298" font-size="10" fill="#86efac" text-anchor="middle">普通文件</text>
+
+  <rect x="260" y="280" width="120" height="34" rx="6" fill="#1e293b" stroke="#43e97b" stroke-width="1.5"/>
+  <text x="320" y="298" font-size="10" fill="#86efac" text-anchor="middle">目录批量</text>
+
+  <!-- 单文件子树：菱形判断 -->
+  <line x1="80" y1="314" x2="80" y2="340" stroke="#94a3b8" stroke-width="2"/>
+  <polygon points="80,340 145,375 80,410 15,375" fill="#1e293b" stroke="#94a3b8" stroke-width="1.5"/>
+  <text x="80" y="367" font-size="9" fill="#cbd5e1" text-anchor="middle">≤10MB</text>
+  <text x="80" y="380" font-size="9" fill="#cbd5e1" text-anchor="middle">≤20 页?</text>
+
+  <text x="35" y="425" font-size="9" font-weight="700" fill="#43e97b">是</text>
+  <text x="135" y="425" font-size="9" font-weight="700" fill="#fbbf24">否</text>
+
+  <!-- 是 → lite -->
+  <line x1="55" y1="408" x2="55" y2="445" stroke="#43e97b" stroke-width="2" marker-end="url(#ar)"/>
+  <rect x="0" y="445" width="170" height="48" rx="6" fill="#1e293b" stroke="#43e97b" stroke-width="2"/>
+  <text x="85" y="463" font-size="11" font-weight="700" fill="#86efac" text-anchor="middle">process_document_lite</text>
+  <text x="85" y="481" font-size="9" fill="#94a3b8" text-anchor="middle">免 Token · IP 限频</text>
+
+  <!-- 否 → process_document -->
+  <line x1="105" y1="408" x2="105" y2="430" stroke="#fbbf24" stroke-width="2"/>
+  <line x1="105" y1="430" x2="200" y2="430" stroke="#fbbf24" stroke-width="2"/>
+  <line x1="200" y1="430" x2="200" y2="445" stroke="#fbbf24" stroke-width="2" marker-end="url(#ar)"/>
+
+  <!-- 普通文件直接到 process_document -->
+  <line x1="200" y1="314" x2="200" y2="445" stroke="#43e97b" stroke-width="2" marker-end="url(#ar)"/>
+  <rect x="180" y="445" width="180" height="48" rx="6" fill="#1e293b" stroke="#43e97b" stroke-width="2"/>
+  <text x="270" y="463" font-size="11" font-weight="700" fill="#86efac" text-anchor="middle">process_document</text>
+  <text x="270" y="481" font-size="9" fill="#94a3b8" text-anchor="middle">11 参数全官方覆盖</text>
+
+  <!-- 目录批量 → process_directory -->
+  <line x1="320" y1="314" x2="320" y2="445" stroke="#43e97b" stroke-width="2" marker-end="url(#ar)"/>
+  <rect x="370" y="445" width="170" height="48" rx="6" fill="#1e293b" stroke="#43e97b" stroke-width="2"/>
+  <text x="455" y="463" font-size="11" font-weight="700" fill="#86efac" text-anchor="middle">process_directory</text>
+  <text x="455" y="481" font-size="9" fill="#94a3b8" text-anchor="middle">异步并行 · 自动拆分</text>
+
+  <!-- 但目录批量箭头在 320，process_directory 在 370 中心 455 -->
+  <line x1="320" y1="430" x2="455" y2="430" stroke="#43e97b" stroke-width="2"/>
+  <line x1="455" y1="430" x2="455" y2="445" stroke="#43e97b" stroke-width="2" marker-end="url(#ar)"/>
+
+  <!-- ============ 查询子树 ============ -->
+  <line x1="550" y1="238" x2="550" y2="280" stroke="#94a3b8" stroke-width="2" marker-end="url(#ar)"/>
+  <rect x="450" y="280" width="200" height="58" rx="8" fill="#1e293b" stroke="#7dd3fc" stroke-width="2"/>
+  <text x="550" y="300" font-size="12" font-weight="700" fill="#7dd3fc" text-anchor="middle">query_task_status</text>
+  <text x="550" y="318" font-size="9" fill="#94a3b8" text-anchor="middle">异步查询 · 精准/轻量都支持</text>
+  <text x="550" y="331" font-size="9" fill="#94a3b8" text-anchor="middle">extracted_pages/total_pages</text>
+
+  <!-- ============ Token 管理子树 ============ -->
+  <line x1="900" y1="238" x2="900" y2="260" stroke="#94a3b8" stroke-width="2"/>
+  <line x1="800" y1="260" x2="1000" y2="260" stroke="#94a3b8" stroke-width="2"/>
+  <line x1="800" y1="260" x2="800" y2="280" stroke="#94a3b8" stroke-width="2" marker-end="url(#ar)"/>
+  <line x1="1000" y1="260" x2="1000" y2="280" stroke="#94a3b8" stroke-width="2" marker-end="url(#ar)"/>
+
+  <rect x="700" y="280" width="200" height="58" rx="8" fill="#1e293b" stroke="#fda4af" stroke-width="2"/>
+  <text x="800" y="300" font-size="12" font-weight="700" fill="#fda4af" text-anchor="middle">get_token_status</text>
+  <text x="800" y="318" font-size="9" fill="#94a3b8" text-anchor="middle">余天 / 用次 / 配额</text>
+  <text x="800" y="331" font-size="9" fill="#94a3b8" text-anchor="middle">needs_renewal 标志</text>
+
+  <rect x="920" y="280" width="160" height="58" rx="8" fill="#1e293b" stroke="#fda4af" stroke-width="2"/>
+  <text x="1000" y="300" font-size="12" font-weight="700" fill="#fda4af" text-anchor="middle">renew_tokens</text>
+  <text x="1000" y="318" font-size="9" fill="#94a3b8" text-anchor="middle">触发 batch_login.py</text>
+  <text x="1000" y="331" font-size="9" fill="#94a3b8" text-anchor="middle">headless 自动续期</text>
+
+  <!-- 限制对比表 -->
+  <rect x="40" y="540" width="1020" height="160" rx="10" fill="#1e293b" stroke="#94a3b8" stroke-width="1.5"/>
+  <text x="550" y="565" font-size="14" font-weight="700" fill="#e2e8f0" text-anchor="middle">⭐ 双 API 对比 · 选哪个？</text>
+
+  <text x="270" y="592" font-size="12" font-weight="700" fill="#86efac" text-anchor="middle">🎯 精准 API （process_document）</text>
+  <text x="830" y="592" font-size="12" font-weight="700" fill="#a78bfa" text-anchor="middle">⚡ 轻量 API （process_document_lite）</text>
+
+  <line x1="550" y1="575" x2="550" y2="690" stroke="#475569" stroke-width="1" stroke-dasharray="4,4"/>
+
+  <g font-size="10" fill="#cbd5e1">
+    <text x="60" y="615">需要 Token：</text>
+    <text x="370" y="615" fill="#fbbf24">✅ 是（multi-account）</text>
+    <text x="600" y="615">需要 Token：</text>
+    <text x="900" y="615" fill="#43e97b">❌ 免登录 · IP 限频</text>
+
+    <text x="60" y="635">文件大小上限：</text>
+    <text x="370" y="635" fill="#fbbf24">200 MB</text>
+    <text x="600" y="635">文件大小上限：</text>
+    <text x="900" y="635" fill="#fda4af">10 MB</text>
+
+    <text x="60" y="655">页数上限：</text>
+    <text x="370" y="655" fill="#fbbf24">200 页（超页自动拆分）</text>
+    <text x="600" y="655">页数上限：</text>
+    <text x="900" y="655" fill="#fda4af">20 页</text>
+
+    <text x="60" y="675">模型版本：</text>
+    <text x="370" y="675" fill="#86efac">vlm / pipeline / MinerU-HTML</text>
+    <text x="600" y="675">模型版本：</text>
+    <text x="900" y="675" fill="#fda4af">固定 pipeline 轻量</text>
+
+    <text x="60" y="692">输出格式：</text>
+    <text x="370" y="692" fill="#86efac">md + json + 可选 docx/html/latex</text>
+    <text x="600" y="692">输出格式：</text>
+    <text x="900" y="692" fill="#fda4af">仅 markdown</text>
+  </g>
+</svg>

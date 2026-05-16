@@ -1,0 +1,107 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 700">
+  <style>text{font-family:'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;dominant-baseline:middle}</style>
+  <defs>
+    <marker id="a" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <polygon points="0 0, 10 5, 0 10" fill="#94a3b8"/>
+    </marker>
+    <marker id="ag" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <polygon points="0 0, 10 5, 0 10" fill="#43e97b"/>
+    </marker>
+  </defs>
+
+  <rect width="1000" height="700" rx="14" fill="#0f172a"/>
+
+  <text x="500" y="38" font-size="22" font-weight="700" fill="#fbbf24" text-anchor="middle">超页 PDF 自动拆分协调流程</text>
+  <text x="500" y="60" font-size="12" fill="#94a3b8" text-anchor="middle">真实案例 · 《PDF-E》496 页 → 3 片 · 全自动拆分 · 并发处理 · 智能合并</text>
+
+  <!-- 原始 PDF -->
+  <rect x="50" y="92" width="200" height="80" rx="10" fill="#1e293b" stroke="#fbbf24" stroke-width="2"/>
+  <text x="150" y="115" font-size="13" font-weight="700" fill="#fbbf24" text-anchor="middle">📕 PDF-E.pdf</text>
+  <text x="150" y="135" font-size="11" fill="#cbd5e1" text-anchor="middle">496 页 · 3.7 MB</text>
+  <text x="150" y="153" font-size="10" fill="#fda4af" text-anchor="middle">⚠️ 超过 200 页限制</text>
+
+  <line x1="250" y1="132" x2="288" y2="132" stroke="#94a3b8" stroke-width="2" marker-end="url(#a)"/>
+
+  <!-- 检测 -->
+  <rect x="288" y="100" width="200" height="64" rx="10" fill="#1e293b" stroke="#94a3b8" stroke-width="1.5"/>
+  <text x="388" y="120" font-size="12" font-weight="700" fill="#7dd3fc" text-anchor="middle">_file_needs_split()</text>
+  <text x="388" y="138" font-size="9" fill="#94a3b8" text-anchor="middle">PyPDF2.PdfReader().pages</text>
+  <text x="388" y="152" font-size="9" fill="#94a3b8" text-anchor="middle">→ 496 &gt; 200 → True</text>
+
+  <line x1="488" y1="132" x2="526" y2="132" stroke="#94a3b8" stroke-width="2" marker-end="url(#a)"/>
+
+  <!-- 拆分策略 -->
+  <rect x="526" y="92" width="424" height="80" rx="10" fill="#1e293b" stroke="#7dd3fc" stroke-width="2"/>
+  <text x="738" y="112" font-size="12" font-weight="700" fill="#7dd3fc" text-anchor="middle">prepare_files() · split_large_pdf()</text>
+  <text x="738" y="132" font-size="10" fill="#cbd5e1" text-anchor="middle">默认 max_pages=180（服务端 200 限制留 10% buffer）</text>
+  <text x="738" y="148" font-size="10" fill="#cbd5e1" text-anchor="middle">chunks_by_pages = ⌈496 / 180⌉ = 3 片  ·  pages_per_chunk = 166</text>
+  <text x="738" y="162" font-size="9" fill="#94a3b8" text-anchor="middle">输出到 PDF-E_chunks/ 下</text>
+
+  <!-- 三个 chunks -->
+  <line x1="500" y1="172" x2="500" y2="200" stroke="#94a3b8" stroke-width="2"/>
+  <line x1="200" y1="200" x2="800" y2="200" stroke="#94a3b8" stroke-width="2"/>
+  <line x1="200" y1="200" x2="200" y2="220" stroke="#94a3b8" stroke-width="2" marker-end="url(#a)"/>
+  <line x1="500" y1="200" x2="500" y2="220" stroke="#94a3b8" stroke-width="2" marker-end="url(#a)"/>
+  <line x1="800" y1="200" x2="800" y2="220" stroke="#94a3b8" stroke-width="2" marker-end="url(#a)"/>
+
+  <!-- Chunk 1 -->
+  <rect x="100" y="220" width="200" height="60" rx="8" fill="#1e293b" stroke="#43e97b" stroke-width="2"/>
+  <text x="200" y="240" font-size="11" font-weight="700" fill="#86efac" text-anchor="middle">part1of3.pdf</text>
+  <text x="200" y="258" font-size="10" fill="#cbd5e1" text-anchor="middle">页 1-166 · 2.1 MB</text>
+  <text x="200" y="272" font-size="9" fill="#94a3b8" text-anchor="middle">175s 完成 ✅</text>
+
+  <!-- Chunk 2 -->
+  <rect x="400" y="220" width="200" height="60" rx="8" fill="#1e293b" stroke="#43e97b" stroke-width="2"/>
+  <text x="500" y="240" font-size="11" font-weight="700" fill="#86efac" text-anchor="middle">part2of3.pdf</text>
+  <text x="500" y="258" font-size="10" fill="#cbd5e1" text-anchor="middle">页 167-332 · 2.0 MB</text>
+  <text x="500" y="272" font-size="9" fill="#94a3b8" text-anchor="middle">143s 完成 ✅</text>
+
+  <!-- Chunk 3 -->
+  <rect x="700" y="220" width="200" height="60" rx="8" fill="#1e293b" stroke="#43e97b" stroke-width="2"/>
+  <text x="800" y="240" font-size="11" font-weight="700" fill="#86efac" text-anchor="middle">part3of3.pdf</text>
+  <text x="800" y="258" font-size="10" fill="#cbd5e1" text-anchor="middle">页 333-496 · 1.8 MB</text>
+  <text x="800" y="272" font-size="9" fill="#94a3b8" text-anchor="middle">174s 完成 ✅</text>
+
+  <!-- 并发处理标识 -->
+  <line x1="200" y1="280" x2="200" y2="310" stroke="#94a3b8" stroke-width="2" marker-end="url(#a)"/>
+  <line x1="500" y1="280" x2="500" y2="310" stroke="#94a3b8" stroke-width="2" marker-end="url(#a)"/>
+  <line x1="800" y1="280" x2="800" y2="310" stroke="#94a3b8" stroke-width="2" marker-end="url(#a)"/>
+
+  <!-- BatchAsyncProcessor -->
+  <rect x="80" y="310" width="840" height="58" rx="10" fill="#1e293b" stroke="#7dd3fc" stroke-width="2"/>
+  <text x="500" y="328" font-size="13" font-weight="700" fill="#7dd3fc" text-anchor="middle">BatchAsyncProcessor · 并发=3 · niquests AsyncSession</text>
+  <text x="500" y="350" font-size="11" fill="#cbd5e1" text-anchor="middle">多账号负载均衡  ·  3 片同时上传/解析/下载  ·  实测最长片耗时 175s（单线程串行需 ~9 分钟）</text>
+
+  <!-- 每片产物 -->
+  <line x1="500" y1="368" x2="500" y2="392" stroke="#94a3b8" stroke-width="2" marker-end="url(#a)"/>
+
+  <rect x="80" y="392" width="840" height="80" rx="10" fill="#1e293b" stroke="#a78bfa" stroke-width="2"/>
+  <text x="500" y="412" font-size="12" font-weight="700" fill="#c4b5fd" text-anchor="middle">每片 chunks/ 下产物</text>
+
+  <text x="200" y="436" font-size="10" fill="#cbd5e1" text-anchor="middle">part1of3.md (69,899 字)</text>
+  <text x="200" y="452" font-size="10" fill="#cbd5e1" text-anchor="middle">part1of3_images/</text>
+
+  <text x="500" y="436" font-size="10" fill="#cbd5e1" text-anchor="middle">part2of3.md (68,707 字)</text>
+  <text x="500" y="452" font-size="10" fill="#cbd5e1" text-anchor="middle">part2of3_images/</text>
+
+  <text x="800" y="436" font-size="10" fill="#cbd5e1" text-anchor="middle">part3of3.md (71,260 字)</text>
+  <text x="800" y="452" font-size="10" fill="#cbd5e1" text-anchor="middle">part3of3_images/</text>
+
+  <!-- 合并 -->
+  <line x1="500" y1="472" x2="500" y2="492" stroke="#fbbf24" stroke-width="2" marker-end="url(#a)"/>
+
+  <rect x="80" y="492" width="840" height="80" rx="10" fill="#1e293b" stroke="#fbbf24" stroke-width="2"/>
+  <text x="500" y="512" font-size="13" font-weight="700" fill="#fbbf24" text-anchor="middle">⑦ merge_results() · auto_split.py</text>
+  <text x="500" y="532" font-size="11" fill="#cbd5e1" text-anchor="middle">拼接 .md（插入 &lt;!-- ===== Part N/M ===== --&gt; 标记）</text>
+  <text x="500" y="548" font-size="11" fill="#cbd5e1" text-anchor="middle">复制每片图片到统一 _images/，加 part{N}_ 前缀避免冲突</text>
+  <text x="500" y="562" font-size="10" fill="#fda4af" text-anchor="middle">path_fixer.rewrite_md_with_part_prefix() 修复所有图片引用</text>
+
+  <line x1="500" y1="572" x2="500" y2="592" stroke="#43e97b" stroke-width="2" marker-end="url(#ag)"/>
+
+  <!-- 最终产物 -->
+  <rect x="200" y="592" width="600" height="80" rx="10" fill="#1e293b" stroke="#43e97b" stroke-width="2"/>
+  <text x="500" y="613" font-size="14" font-weight="700" fill="#86efac" text-anchor="middle">📗 PDF-E-带目录.md</text>
+  <text x="500" y="633" font-size="11" fill="#cbd5e1" text-anchor="middle">209,955 字符 · 3 片标记齐全 · 图片引用 0 缺失</text>
+  <text x="500" y="649" font-size="10" fill="#94a3b8" text-anchor="middle">合并完成 · 用户视角：单文件输入 → 单文件输出 · 拆分协调 100% 透明</text>
+  <text x="500" y="664" font-size="10" fill="#fbbf24" text-anchor="middle">总耗时 ~3 分钟（含拆分+并发处理+合并）</text>
+</svg>
